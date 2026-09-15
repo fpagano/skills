@@ -1,6 +1,12 @@
 ---
 name: qonto-crew-onboard
 description: One-sentence financial onboarding (and offboarding) of an employee on Qonto. Reads a per-role policy defined once with the user (card caps, online-only, team), then on "Alex starts Monday as a developer" it invites the member, creates the team if new, and prepares a capped card request that conforms to the policy — plus a Notion welcome page, a day-1 calendar event and a Gmail welcome draft when those MCPs are connected. Offboarding is the mirror image - freeze the cards, generate a recovery checklist, delete nothing. Use for "Alex arrive lundi comme dev", "onboard Sam as an account exec", "prépare l'arrivée de la nouvelle recrue", "Sam is leaving Friday — offboard him", "gèle sa carte".
+permissions:
+  mcp:
+    qonto: [change_card_status, create_card, create_card_request, create_membership, create_team, get_authenticated_membership, get_organization, get_qonto_public_pricing, get_subscription, list_cards, list_memberships, list_requests, list_teams]
+  network: []
+  env: []
+  tools: [Read]
 ---
 
 # Qonto Crew Onboard
