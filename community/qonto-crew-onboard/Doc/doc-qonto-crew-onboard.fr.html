@@ -118,7 +118,7 @@
   <div class="grid4">
     <div class="pcard"><span class="n">1</span><h4>Policy par rôle</h4><p>Définie une fois avec l'utilisateur — type de carte, plafonds, online-only, équipe par rôle. Jamais inventée : rôle inconnu = questions.</p></div>
     <div class="pcard"><span class="n">2</span><h4>Onboarding en une phrase</h4><p>« Alex arrive lundi comme dev » : invitation envoyée, équipe créée si nouvelle, demande de carte plafonnée conforme à la policy.</p></div>
-    <div class="pcard"><span class="n">3</span><h4>Pack d'accueil multi-MCP</h4><p>Page Notion, événement J1 Google Calendar, brouillon Gmail — si ces MCP sont connectés, sinon annoncé et le cœur continue.</p></div>
+    <div class="pcard"><span class="n">3</span><h4>Checklist d'accueil</h4><p>Informations J1, policy de carte, éléments en attente et rappels.</p></div>
     <div class="pcard"><span class="n">4</span><h4>Offboarding miroir</h4><p>« Sam part vendredi » : cartes gelées (réversible) + checklist de récupération. Rien de supprimé — les révocations restent dans l'app.</p></div>
   </div>
 </section>
@@ -132,8 +132,7 @@
     <tr><td><b>MCP Qonto connecté</b></td><td>Connecteur officiel (claude.ai / Claude Desktop), login OAuth</td><td>✅</td></tr>
     <tr><td><b>Rôle Admin/Owner</b></td><td>Inviter et demander une carte l'exigent — vérifié via <code>get_authenticated_membership</code>, annoncé honnêtement sinon</td><td>✅</td></tr>
     <tr><td><b>Policy par rôle</b></td><td>Décidée par l'utilisateur, jamais par le skill</td><td>✅ décidée par toi</td></tr>
-    <tr><td><b>Sièges dispo sur le plan</b></td><td>Grille non lisible via MCP (<code>get_subscription</code> → 403) — le skill demande le plan et compte les membres avant d'inviter</td><td>ℹ️ vérifié en le demandant</td></tr>
-    <tr><td><b>Notion · Google Calendar · Gmail</b></td><td>Pack d'accueil optionnel, détecté dynamiquement</td><td>⭕</td></tr>
+    <tr><td><b>Sièges dispo sur le plan</b></td><td>Le skill demande le plan et compte les membres avant d'inviter</td><td>ℹ️ vérifié en le demandant</td></tr>
   </table></div>
 </section>
 
@@ -145,8 +144,7 @@
     <li><strong>Rôle du demandeur vérifié d'abord</strong> : pas Admin/Owner → avertissement honnête et aperçu en lecture seule de ce qui serait fait</li>
     <li><strong>Email jamais deviné</strong> : absent de la phrase → demandé ; déjà invité → détecté dans <code>list_memberships</code>, invitation sautée avec la raison</li>
     <li><strong>Équipes rapprochées avant création</strong> : « tech » vs « Tech » → pas de doublon, <code>create_team</code> seulement si l'équipe n'existe vraiment pas</li>
-    <li><strong>Limite de membres du plan</strong> : <code>get_subscription</code> renvoie 403 sur le connecteur → le skill demande le plan, compte les membres, prévient avant d'inviter</li>
-    <li>MCP Notion / Calendar / Gmail absents → une ligne honnête chacun, le cœur Qonto continue</li>
+    <li><strong>Limite de membres du plan</strong> : le skill demande le plan, compte les membres, prévient avant d'inviter</li>
     <li>Offboarding d'un membre sans carte → checklist seule, et le skill dit exactement ce qui reste à faire dans l'app · pagination ≤ 50 partout</li>
   </ul>
 </section>
@@ -187,8 +185,6 @@
   <div class="scroll"><table>
     <tr><th>Sortie</th><th>Format</th><th>Quand</th></tr>
     <tr><td><b>Réponse dans la conversation</b></td><td>Tableaux markdown : récap (✅ fait / 🕐 en attente SCA / ⏭ sauté), statut de la demande de carte, checklist</td><td><strong>Toujours</strong> — c'est la base</td></tr>
-    <tr><td><b>Fiche d'onboarding</b></td><td>Fichier/artifact <strong>HTML</strong> une page : qui arrive, quand, ce qui est prêt, ce qui attend</td><td>Si l'hôte affiche les fichiers ; repli automatique sur les tableaux</td></tr>
-    <tr><td><b>Page Notion · événement Calendar · brouillon Gmail</b></td><td>Pack d'accueil (le brouillon n'est jamais envoyé par le skill)</td><td>Si ces MCP sont connectés</td></tr>
   </table></div>
 </section>
 
@@ -205,7 +201,6 @@
     <tr><td>Onboarding par lot (« 3 stagiaires arrivent le 1er »)</td><td>Faible</td><td>Même workflow, récap groupé, confirmations une à une</td></tr>
     <tr><td>Rappel J-1 au manager (Google Calendar)</td><td>Faible</td><td>Détection dynamique du MCP</td></tr>
     <tr><td>Suivi des demandes de carte (<code>list_requests</code>)</td><td>Faible</td><td>« Où en est la carte d'Alex ? »</td></tr>
-    <tr><td>Passerelle avec qonto-reimburse-batch</td><td>Moyen</td><td>Les premiers frais du nouvel arrivant — lecture des membres partagée</td></tr>
   </table></div>
 </section>
 
@@ -214,7 +209,7 @@
   <ul>
     <li><strong>Jamais</strong> d'écriture sans confirmation explicite : récap complet, puis chaque écriture (<code>create_membership</code>, <code>create_team</code>, <code>create_card_request</code>, <code>change_card_status</code>) confirmée une à une ; une demande en attente n'est jamais présentée comme exécutée</li>
     <li><strong>La policy est décidée par l'utilisateur, jamais inventée</strong> — rôle inconnu = questions</li>
-    <li>Limite de membres du plan : grille non lisible (<code>get_subscription</code> 403) → plan demandé, membres comptés, avertissement avant d'inviter</li>
+    <li>Limite de membres du plan : plan demandé, membres comptés, avertissement avant d'inviter</li>
     <li><strong>L'offboarding ne supprime jamais rien</strong> : gel réversible + checklist ; révocations définitives dans l'app</li>
     <li>Rôle Admin/Owner vérifié d'abord · emails jamais devinés · pagination ≤ 50 partout</li>
   </ul>

@@ -21,11 +21,7 @@
 1. Tell Claude: "**Let's define my onboarding policy**"
 2. For each role: card type (virtual/physical), monthly cap, online-only or not, team
 3. The skill shows it back as a table — **you** decide, it never invents
-4. Tip: paste the policy into your project instructions (or a Notion note) so it's re-read on every arrival
-
-### Step 4 — Connect the welcome-pack MCPs (optional)
-- **Notion** (welcome page), **Google Calendar** (day-1 event), **Gmail** (welcome draft)
-- Detected dynamically: when absent, the skill says so and continues in pure Qonto
+4. Tip: paste the policy into your project instructions so it's re-read on every arrival
 
 ## 2️⃣ On every arrival (~2 min)
 
@@ -35,7 +31,6 @@
 | 2 | Give Alex's email | Full recap: invitation + team + capped card request |
 | 3 | Confirm each write ("yes") one by one | Invitation sent · team created if new · card **request** filed |
 | 4 | In the **Qonto app**: Requests → approve the card (**SCA**) | The card exists, capped per your policy ✅ |
-| 5 | (When MCPs are connected) approve the welcome pack | Notion page + day-1 event + Gmail draft ready |
 
 ## 3️⃣ Offboarding (the mirror, ~1 min)
 
@@ -60,20 +55,16 @@
 | Output | Format | When |
 |---|---|---|
 | **Conversation reply** | Markdown tables: recap (✅ / 🕐 pending SCA / ⏭ skipped), offboarding checklist | **Always** — the baseline |
-| **Onboarding sheet** | One-page **HTML** file/artifact: who, when, what's ready, what's pending | When the host renders files; fallback to tables otherwise |
-| **Notion page · Calendar event · Gmail draft** | Welcome pack | When those MCPs are connected |
 
 ## 6️⃣ Troubleshooting (known, verified quirks)
 
 | Symptom | Cause | Fix |
 |---|---|---|
-| `403 missing oauth scope` on `get_subscription` | Outside the claude.ai connector scope — the plan grid isn't readable | Expected — the skill **asks your plan** and counts members before inviting |
 | Invitation fails or the write is refused | Connected account isn't Admin/Owner | Reconnect with an Admin/Owner account — the skill checks and announces it upfront |
 | "Member already exists" | Email already invited | Caught via `list_memberships` — the skill skips the invitation and says why |
 | The card doesn't show up | It's a card **request**, not a card | Qonto app → Requests → approve with SCA |
 | Duplicate team | Different casing ("tech" vs "Tech") | The skill matches against `list_teams` before any `create_team` |
 | Large org, truncated responses | Pagination | `per_page` ≤ 50 everywhere, handled by the skill |
-| No Notion page / event / draft | MCP not connected | Expected — announced by the skill, the Qonto core continues |
 
 ## 🔒 Security reminder
 

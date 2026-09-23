@@ -118,7 +118,7 @@
   <div class="grid4">
     <div class="pcard"><span class="n">1</span><h4>Per-role policy</h4><p>Defined once with the user — card type, caps, online-only, team per role. Never invented: an unknown role triggers questions.</p></div>
     <div class="pcard"><span class="n">2</span><h4>One-sentence onboarding</h4><p>"Alex starts Monday as a developer": invitation sent, team created if new, a capped card request that conforms to the policy.</p></div>
-    <div class="pcard"><span class="n">3</span><h4>Multi-MCP welcome pack</h4><p>Notion page, day-1 Google Calendar event, Gmail draft — when those MCPs are connected; otherwise announced, core continues.</p></div>
+    <div class="pcard"><span class="n">3</span><h4>Welcome checklist</h4><p>First-day information, card policy, pending items and reminders.</p></div>
     <div class="pcard"><span class="n">4</span><h4>Mirror offboarding</h4><p>"Sam is leaving Friday": cards frozen (reversible) + recovery checklist. Nothing deleted — revocations stay in the app.</p></div>
   </div>
   <p style="margin-top:.8rem">Would someone use this on a Monday morning? <strong>That's literally when new hires show up.</strong></p>
@@ -133,8 +133,7 @@
     <tr><td><b>Qonto MCP connected</b></td><td>Official connector (claude.ai / Claude Desktop), OAuth login</td><td>✅</td></tr>
     <tr><td><b>Admin/Owner role</b></td><td>Inviting and requesting cards require it — checked via <code>get_authenticated_membership</code>, honestly announced otherwise</td><td>✅</td></tr>
     <tr><td><b>Per-role policy</b></td><td>Decided by the user, never by the skill</td><td>✅ user-decided</td></tr>
-    <tr><td><b>Seats left on the plan</b></td><td>Grid not readable via MCP (<code>get_subscription</code> → 403) — the skill asks the plan and counts members before inviting</td><td>ℹ️ verified by asking</td></tr>
-    <tr><td><b>Notion · Google Calendar · Gmail</b></td><td>Optional welcome pack, detected dynamically</td><td>⭕</td></tr>
+    <tr><td><b>Seats left on the plan</b></td><td>The skill asks the plan and counts members before inviting</td><td>ℹ️ verified by asking</td></tr>
   </table></div>
 </section>
 
@@ -146,8 +145,7 @@
     <li><strong>Requester's role checked first</strong>: not Admin/Owner → honest warning and a read-only preview of what would be done</li>
     <li><strong>Emails never guessed</strong>: missing from the sentence → asked for; already invited → caught in <code>list_memberships</code>, invitation skipped with the reason</li>
     <li><strong>Teams matched before creation</strong>: "tech" vs "Tech" → no duplicates, <code>create_team</code> only when the team truly doesn't exist</li>
-    <li><strong>Plan member limits</strong>: <code>get_subscription</code> returns 403 on the connector → the skill asks the plan, counts members, warns before inviting</li>
-    <li>Notion / Calendar / Gmail MCP absent → one honest line each, the Qonto core continues</li>
+    <li><strong>Plan member limits</strong>: the skill asks the plan, counts members, warns before inviting</li>
     <li>Offboarding a member with no cards → checklist only, and the skill says exactly what the app must handle · pagination ≤ 50 everywhere</li>
   </ul>
 </section>
@@ -188,8 +186,6 @@
   <div class="scroll"><table>
     <tr><th>Output</th><th>Format</th><th>When</th></tr>
     <tr><td><b>Conversation reply</b></td><td>Markdown tables: recap (✅ done / 🕐 pending SCA / ⏭ skipped), card-request status, checklist</td><td><strong>Always</strong> — the baseline</td></tr>
-    <tr><td><b>Onboarding sheet</b></td><td>One-page <strong>HTML</strong> file/artifact: who arrives, when, what's ready, what's pending</td><td>When the host renders files; automatic fallback to tables</td></tr>
-    <tr><td><b>Notion page · Calendar event · Gmail draft</b></td><td>Welcome pack (the draft is never sent by the skill)</td><td>When those MCPs are connected</td></tr>
   </table></div>
 </section>
 
@@ -206,7 +202,6 @@
     <tr><td>Batch onboarding ("3 interns start on the 1st")</td><td>Low</td><td>Same workflow, grouped recap, one-by-one confirmations</td></tr>
     <tr><td>D-1 reminder to the manager (Google Calendar)</td><td>Low</td><td>Dynamic MCP detection</td></tr>
     <tr><td>Card-request tracking (<code>list_requests</code>)</td><td>Low</td><td>"Where is Alex's card?"</td></tr>
-    <tr><td>Bridge with qonto-reimburse-batch</td><td>Medium</td><td>The new hire's first expense claims — shared member reads</td></tr>
   </table></div>
 </section>
 
@@ -215,7 +210,7 @@
   <ul>
     <li><strong>Never</strong> writes without explicit confirmation: full recap first, then each write (<code>create_membership</code>, <code>create_team</code>, <code>create_card_request</code>, <code>change_card_status</code>) confirmed one by one; a pending request is never presented as done</li>
     <li><strong>The policy is user-decided, never invented</strong> — unknown role = questions</li>
-    <li>Plan member limits: grid not readable (<code>get_subscription</code> 403) → plan asked, members counted, warning before inviting</li>
+    <li>Plan member limits: plan asked, members counted, warning before inviting</li>
     <li><strong>Offboarding never deletes anything</strong>: reversible freeze + checklist; definitive revocations in the app</li>
     <li>Admin/Owner checked first · emails never guessed · pagination ≤ 50 everywhere</li>
   </ul>

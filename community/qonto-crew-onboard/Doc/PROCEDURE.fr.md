@@ -21,11 +21,7 @@
 1. Dire à Claude : « **Définissons ma policy d'onboarding** »
 2. Pour chaque rôle : type de carte (virtuelle/physique), plafond mensuel, online-only ou pas, équipe
 3. Le skill l'affiche en tableau — c'est **toi** qui décides, il n'invente jamais
-4. Astuce : colle la policy dans les instructions du projet (ou une note Notion) pour qu'elle soit relue à chaque arrivée
-
-### Étape 4 — Connecter les MCP du pack d'accueil (optionnel)
-- **Notion** (page d'accueil), **Google Calendar** (événement J1), **Gmail** (brouillon de bienvenue)
-- Détectés dynamiquement : absents, le skill le dit et continue en Qonto pur
+4. Astuce : colle la policy dans les instructions du projet pour qu'elle soit relue à chaque arrivée
 
 ## 2️⃣ Utilisation à chaque arrivée (~2 min)
 
@@ -35,7 +31,6 @@
 | 2 | Donner l'email d'Alex | Récapitulatif complet : invitation + équipe + demande de carte plafonnée |
 | 3 | Confirmer chaque écriture (« oui ») une à une | L'invitation part · l'équipe est créée si nouvelle · la **demande** de carte est déposée |
 | 4 | Dans l'**app Qonto** : section Demandes → approuver la carte (**SCA**) | La carte existe, plafonnée conformément à la policy ✅ |
-| 5 | (Si MCP présents) valider le pack d'accueil | Page Notion + événement J1 + brouillon Gmail prêts |
 
 ## 3️⃣ Offboarding (le miroir, ~1 min)
 
@@ -60,20 +55,16 @@
 | Sortie | Format | Quand |
 |---|---|---|
 | **Réponse dans la conversation** | Tableaux markdown : récap (✅ / 🕐 en attente SCA / ⏭ sauté), checklist d'offboarding | **Toujours** — c'est la base |
-| **Fiche d'onboarding** | Fichier/artifact **HTML** une page : qui, quand, ce qui est prêt, ce qui attend | Si l'hôte affiche les fichiers ; repli sur les tableaux sinon |
-| **Page Notion · événement Calendar · brouillon Gmail** | Pack d'accueil | Si ces MCP sont connectés |
 
 ## 6️⃣ Dépannage (erreurs connues et vérifiées)
 
 | Symptôme | Cause | Solution |
 |---|---|---|
-| `403 missing oauth scope` sur `get_subscription` | Hors périmètre du connecteur claude.ai — la grille des plans n'est pas lisible | Normal — le skill **demande ton plan** et compte les membres avant d'inviter |
 | L'invitation échoue ou l'écriture est refusée | Compte connecté sans rôle Admin/Owner | Se reconnecter avec un compte Admin/Owner — le skill le vérifie et l'annonce dès le départ |
 | « Ce membre existe déjà » | Email déjà invité | Détecté via `list_memberships` — le skill saute l'invitation et le dit |
 | La carte n'apparaît pas | C'est une **demande** de carte, pas une carte | App Qonto → Demandes → approuver avec la SCA |
 | Équipe en double | Casse différente (« tech » vs « Tech ») | Le skill rapproche avec `list_teams` avant tout `create_team` |
 | Grosse organisation, réponses tronquées | Pagination | `per_page` ≤ 50 partout, géré par le skill |
-| Pas de page Notion / événement / brouillon | MCP non connecté | Normal — annoncé par le skill, le cœur Qonto continue |
 
 ## 🔒 Rappel sécurité
 
