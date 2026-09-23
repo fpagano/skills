@@ -213,6 +213,31 @@ class AutomaticExecutionTests(unittest.TestCase):
 
         self.assertTrue(any(f.level == "fail" and f.check == "automatic-execution" for f in report.findings))
 
+    def test_codex_overlay_component_fields_are_rejected(self):
+        for field in ("hooks", "apps", "mcpServers"):
+            with self.subTest(field=field):
+                plugin = self.root / "community" / field
+                overlay = plugin / ".codex-plugin"
+                overlay.mkdir(parents=True)
+                (overlay / "plugin.json").write_text(json.dumps({
+                    "name": field, "version": "0.1.0", "interface": {"display_name": field}, field: {},
+                }))
+                report = fc.Report()
+
+                fc.check_component_configs(plugin, report)
+
+                self.assertTrue(any(f.level == "fail" and f.check == "automatic-execution" for f in report.findings))
+
+    def test_malformed_mcp_servers_are_rejected(self):
+        plugin = self.root / "community" / "plugin"
+        plugin.mkdir(parents=True)
+        (plugin / "mcp.json").write_text(json.dumps({"mcpServers": []}))
+        report = fc.Report()
+
+        fc.check_component_configs(plugin, report)
+
+        self.assertTrue(any(f.level == "fail" and f.check == "layout" for f in report.findings))
+
 
 class LayoutTests(unittest.TestCase):
     def setUp(self):

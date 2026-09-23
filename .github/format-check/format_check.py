@@ -55,6 +55,8 @@ FRONTMATTER_KEYS = {"name", "description", "license", "allowed-tools", "metadata
                     "compatibility", "permissions"}
 COMMUNITY_MANIFEST_KEYS = {"$schema", "name", "displayName", "version", "description", "author", "homepage",
                            "repository", "license", "keywords", "metadata", "defaultEnabled", "skills"}
+COMMUNITY_CODEX_MANIFEST_KEYS = {"$schema", "name", "displayName", "version", "description", "author", "homepage",
+                                 "repository", "license", "keywords", "metadata", "interface"}
 CANONICAL_SKILLS_PATHS = {"./skills/", "./skills", "skills", "skills/"}
 NATIVE_TOOLS = {"Read", "Write", "Edit", "MultiEdit", "Bash", "Glob", "Grep", "WebFetch",
                 "WebSearch", "Task", "NotebookEdit", "TodoWrite", "AskUserQuestion", "Skill"}
@@ -857,11 +859,25 @@ def check_component_configs(pdir: Path, rep: Report):
             continue
         if not isinstance(data, dict):
             continue
+        if p.relative_to(pdir).as_posix() == ".codex-plugin/plugin.json":
+            unsupported = sorted(set(data) - COMMUNITY_CODEX_MANIFEST_KEYS)
+            if unsupported:
+                rep.add("fail", "automatic-execution",
+                        "Community Codex plugin manifests may contain metadata and `interface` only; unsupported "
+                        "field(s): " + ", ".join(f"`{key}`" for key in unsupported) + ".",
+                        file=r, fix="Remove component configuration from `.codex-plugin/plugin.json`. Community "
+                        "plugins cannot register automatic execution surfaces or custom component paths.")
+            continue
         if any(hooks_declare_commands(h) for h in declared_hooks(data)):
             rep.add("fail", "automatic-execution", f"`{r}` declares hook configuration.", file=r,
                     fix="Community plugins cannot register hooks that execute automatically. Remove the file, or move "
                         "user-invoked steps into the skill instructions or scripts.")
-        for sname, s in (data.get("mcpServers") or {}).items():
+        servers = data.get("mcpServers")
+        if servers is not None and not isinstance(servers, dict):
+            rep.add("fail", "layout", f"`{r}` field `mcpServers` must be a JSON object.", file=r,
+                    fix="Map each MCP server name to its configuration object.")
+            continue
+        for sname, s in (servers or {}).items():
             if isinstance(s, dict) and s.get("command"):
                 rep.add("fail", "mcp-command", f"`{r}` starts local MCP server `{sname}`.", file=r,
                         fix="Remove the local `command` server. Use a declared HTTPS server, or keep it outside the plugin.")
