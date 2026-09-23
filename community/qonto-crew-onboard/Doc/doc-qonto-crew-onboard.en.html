@@ -139,7 +139,6 @@
 
 <section>
   <h2>⚙️ How it works</h2>
-  <div class="diagram"><img src="../assets/flow.en.svg" alt="How it works — 6 steps"></div>
   <h3>Holds up on messy data</h3>
   <ul>
     <li><strong>Requester's role checked first</strong>: not Admin/Owner → honest warning and a read-only preview of what would be done</li>
@@ -151,8 +150,6 @@
 </section>
 
 <section>
-  <h2>🏗 Functional diagram</h2>
-  <div class="diagram"><img src="../assets/functional.en.svg" alt="Functional diagram"></div>
   <div class="secu" style="margin-top:1rem">
     <div class="lock">🔒</div>
     <p><b>The security model, not a limitation:</b> reads are risk-free; every write requires explicit confirmation in the conversation. The card is <b>never</b> created directly — <code>create_card_request</code> files a policy-compliant capped <b>request</b>, approved in the Qonto app by an Admin/Owner with their own SCA. And offboarding freezes, it doesn't delete.</p>

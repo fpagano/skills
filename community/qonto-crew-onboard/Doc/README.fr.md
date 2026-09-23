@@ -36,18 +36,12 @@
 
 ## ⚙️ Fonctionnement global
 
-![Fonctionnement global](assets/flow.fr.png)
-
 1. **Photographie du compte** : `get_organization` d'abord, `get_authenticated_membership` (rôle du demandeur — Admin/Owner requis pour écrire, dit honnêtement sinon), membres, équipes et cartes existants
 2. **Policy par rôle** : chargée ou définie avec toi ; limite de membres du plan vérifiée **avant** d'inviter (plan demandé, membres comptés)
 3. **Une phrase** : « Alex arrive lundi comme dev » → prénom, rôle, date extraits ; l'email est demandé (jamais deviné) ; **récapitulatif complet affiché avant la moindre écriture**
 4. **Exécution — chaque écriture confirmée une à une** : `create_membership` (invitation), `create_team` si nouvelle équipe, `create_card_request` — une *demande* de carte plafonnée qui attend l'approbation SCA dans l'app, jamais présentée comme une carte active
 5. **Checklist d'accueil** : informations J1, policy de carte, éléments en attente et rappels
 6. **Offboarding miroir** : cartes gelées (`change_card_status`, réversible), checklist de récupération — carte, matériel, accès. Rien de supprimé : les révocations définitives se font dans l'app Qonto
-
-## 🏗 Schéma fonctionnel
-
-![Schéma fonctionnel](assets/functional.fr.png)
 
 **Le point clé de sécurité** : les lectures (trait plein) sont sans risque ; chaque écriture (trait pointillé) exige une confirmation explicite dans la conversation. Et la carte n'est **jamais** créée directement : `create_card_request` produit une *demande* qui atterrit dans la section Demandes de l'app Qonto, où un Admin/Owner l'approuve avec sa propre SCA. **C'est le modèle de sécurité, pas une limitation.**
 

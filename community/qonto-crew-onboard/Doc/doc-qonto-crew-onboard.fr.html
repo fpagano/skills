@@ -138,7 +138,6 @@
 
 <section>
   <h2>⚙️ Fonctionnement global</h2>
-  <div class="diagram"><img src="../assets/flow.fr.svg" alt="Fonctionnement global en 6 étapes"></div>
   <h3>Ce qui rend le skill robuste sur données sales</h3>
   <ul>
     <li><strong>Rôle du demandeur vérifié d'abord</strong> : pas Admin/Owner → avertissement honnête et aperçu en lecture seule de ce qui serait fait</li>
@@ -150,8 +149,6 @@
 </section>
 
 <section>
-  <h2>🏗 Schéma fonctionnel</h2>
-  <div class="diagram"><img src="../assets/functional.fr.svg" alt="Schéma fonctionnel"></div>
   <div class="secu" style="margin-top:1rem">
     <div class="lock">🔒</div>
     <p><b>Le modèle de sécurité, pas une limitation :</b> les lectures sont sans risque ; chaque écriture exige une confirmation explicite dans la conversation. La carte n'est <b>jamais</b> créée directement — <code>create_card_request</code> produit une <b>demande</b> plafonnée conforme à la policy, approuvée dans l'app Qonto par un Admin/Owner avec sa propre SCA. Et l'offboarding gèle, il ne supprime pas.</p>

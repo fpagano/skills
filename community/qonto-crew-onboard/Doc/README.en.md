@@ -38,18 +38,12 @@ Would someone use this on a Monday morning? That's literally when new hires show
 
 ## ⚙️ How it works
 
-![How it works](assets/flow.en.png)
-
 1. **Account snapshot**: `get_organization` first, `get_authenticated_membership` (requester's role — Admin/Owner needed for the writes, honestly stated otherwise), existing members, teams and cards
 2. **Per-role policy**: loaded or defined with the user; plan member limit checked **before** inviting (plan asked, members counted)
 3. **One sentence**: "Alex starts Monday as a developer" → name, role, start date extracted; the email is asked for (never guessed); **a full recap is shown before any write**
 4. **Execution — every write individually confirmed**: `create_membership` (invitation), `create_team` if new, `create_card_request` — a card *request* pending SCA approval in the app, never presented as an active card
 5. **Welcome checklist**: first-day information, card policy, pending items and reminders
 6. **Mirror offboarding**: cards frozen (`change_card_status`, reversible), recovery checklist — card, equipment, accesses. Nothing deleted: definitive revocations happen in the Qonto app
-
-## 🏗 Functional diagram
-
-![Functional diagram](assets/functional.en.png)
 
 **The security model** (not a limitation): solid arrows are risk-free reads; every dashed write requires explicit confirmation in the conversation. And the card is **never** created directly: `create_card_request` produces a *request* that lands in the Requests section of the Qonto app, where an Admin/Owner approves it with their own SCA.
 
