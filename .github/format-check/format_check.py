@@ -823,12 +823,26 @@ def hooks_declare_commands(value) -> bool:
     return False
 
 
+def declared_hooks(data: dict) -> list:
+    """Every hooks declaration in a JSON object: top-level `hooks` plus the portable
+    `extensions.com.openai.hooks` overlay, which the Codex runtime reads when a recognized
+    root `plugin.json` is present."""
+    out = []
+    if data.get("hooks") is not None:
+        out.append(data["hooks"])
+    ext = data.get("extensions")
+    if isinstance(ext, dict) and isinstance(ext.get("com.openai"), dict) and ext["com.openai"].get("hooks") is not None:
+        out.append(ext["com.openai"]["hooks"])
+    return out
+
+
 def check_component_configs(pdir: Path, rep: Report):
     """Hook or command-MCP configuration in ANY JSON file, whatever its name: component
     registration is content, not filename. The Codex overlay (`.codex-plugin/plugin.json`),
     the portable `mcp.json` and hooks at custom paths all declare the same keys. The Claude
     manifest (key-validated) and the literal `.mcp.json` (MCP commands checked in
-    scan_text_file) are handled separately."""
+    scan_text_file) are handled separately. `utf-8-sig` strips a BOM, so a runtime that
+    tolerates one cannot hide a component behind it."""
     if not is_community_path(pdir):
         return
     for p in sorted(pdir.rglob("*.json")):
@@ -838,12 +852,12 @@ def check_component_configs(pdir: Path, rep: Report):
         if p.relative_to(pdir).as_posix() in (".claude-plugin/plugin.json", ".mcp.json"):
             continue
         try:
-            data = json.loads(read_text(p))
+            data = json.loads(p.read_text(encoding="utf-8-sig", errors="replace"))
         except json.JSONDecodeError:
             continue
         if not isinstance(data, dict):
             continue
-        if hooks_declare_commands(data.get("hooks")):
+        if any(hooks_declare_commands(h) for h in declared_hooks(data)):
             rep.add("fail", "automatic-execution", f"`{r}` declares hook configuration.", file=r,
                     fix="Community plugins cannot register hooks that execute automatically. Remove the file, or move "
                         "user-invoked steps into the skill instructions or scripts.")

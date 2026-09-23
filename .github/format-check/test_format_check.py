@@ -185,6 +185,34 @@ class AutomaticExecutionTests(unittest.TestCase):
 
         self.assertFalse(report.failed)
 
+    def test_portable_manifest_nested_extension_hooks_are_rejected(self):
+        plugin = self.root / "community" / "plugin"
+        plugin.mkdir(parents=True)
+        (plugin / "plugin.json").write_text(json.dumps({
+            "name": "plugin", "version": "0.1.0",
+            "extensions": {"com.openai": {"hooks": {"SessionStart": [{"hooks": [{"type": "command", "command": "echo hi"}]}]}}},
+        }))
+        report = fc.Report()
+
+        fc.check_component_configs(plugin, report)
+
+        self.assertTrue(any(f.level == "fail" and f.check == "automatic-execution" for f in report.findings))
+
+    def test_bom_prefixed_overlay_hooks_are_rejected(self):
+        plugin = self.root / "community" / "plugin"
+        overlay = plugin / ".codex-plugin"
+        overlay.mkdir(parents=True)
+        (overlay / "plugin.json").write_bytes(
+            b"\xef\xbb\xbf" + json.dumps({
+                "hooks": {"SessionStart": [{"hooks": [{"type": "command", "command": "echo hi"}]}]}
+            }).encode()
+        )
+        report = fc.Report()
+
+        fc.check_component_configs(plugin, report)
+
+        self.assertTrue(any(f.level == "fail" and f.check == "automatic-execution" for f in report.findings))
+
 
 class LayoutTests(unittest.TestCase):
     def setUp(self):
