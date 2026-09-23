@@ -112,6 +112,79 @@ class AutomaticExecutionTests(unittest.TestCase):
 
         self.assertEqual(sum(f.level == "fail" and f.check == "automatic-execution" for f in report.findings), 2)
 
+    def test_codex_overlay_inline_hooks_are_rejected(self):
+        plugin = self.root / "community" / "plugin"
+        overlay = plugin / ".codex-plugin"
+        overlay.mkdir(parents=True)
+        (overlay / "plugin.json").write_text(json.dumps({
+            "name": "plugin", "version": "0.1.0", "description": "Overlay with hooks.",
+            "hooks": {"SessionStart": [{"hooks": [{"type": "command", "command": "python3 warmup.py"}]}]},
+        }))
+        report = fc.Report()
+
+        fc.check_component_configs(plugin, report)
+
+        self.assertTrue(any(f.level == "fail" and f.check == "automatic-execution" for f in report.findings))
+
+    def test_custom_path_hooks_are_rejected(self):
+        plugin = self.root / "community" / "plugin"
+        cfg = plugin / "cfg"
+        cfg.mkdir(parents=True)
+        (cfg / "hooks.json").write_text(json.dumps({
+            "hooks": {"PreToolUse": [{"matcher": "Bash", "hooks": [{"type": "command", "command": "echo hi"}]}]}
+        }))
+        report = fc.Report()
+
+        fc.check_component_configs(plugin, report)
+
+        self.assertTrue(any(f.level == "fail" and f.check == "automatic-execution" for f in report.findings))
+
+    def test_portable_mcp_json_command_server_is_rejected(self):
+        plugin = self.root / "community" / "plugin"
+        plugin.mkdir(parents=True)
+        (plugin / "mcp.json").write_text(json.dumps({"mcpServers": {"helper": {"command": "npx", "args": ["helper@1.0.0"]}}}))
+        report = fc.Report()
+
+        fc.check_component_configs(plugin, report)
+
+        self.assertTrue(any(f.level == "fail" and f.check == "mcp-command" for f in report.findings))
+
+    def test_codex_overlay_hooks_by_reference_are_rejected(self):
+        plugin = self.root / "community" / "plugin"
+        overlay = plugin / ".codex-plugin"
+        overlay.mkdir(parents=True)
+        (overlay / "plugin.json").write_text(json.dumps({"hooks": "./cfg/hooks.json"}))
+        report = fc.Report()
+
+        fc.check_component_configs(plugin, report)
+
+        self.assertTrue(any(f.level == "fail" and f.check == "automatic-execution" for f in report.findings))
+
+    def test_plain_data_json_is_not_a_component(self):
+        plugin = self.root / "community" / "plugin"
+        assets = plugin / "assets"
+        assets.mkdir(parents=True)
+        (assets / "data.json").write_text(json.dumps({"hooks": [], "title": "Rates"}))
+        (assets / "rates.json").write_text(json.dumps({"table": [["20", "standard"]], "webhooks": []}))
+        report = fc.Report()
+
+        fc.check_component_configs(plugin, report)
+
+        self.assertFalse(report.failed)
+
+    def test_featured_component_configs_remain_reviewable(self):
+        plugin = self.root / "featured" / "plugin"
+        overlay = plugin / ".codex-plugin"
+        overlay.mkdir(parents=True)
+        (overlay / "plugin.json").write_text(json.dumps({
+            "hooks": {"SessionStart": [{"hooks": [{"type": "command", "command": "echo hi"}]}]}
+        }))
+        report = fc.Report()
+
+        fc.check_component_configs(plugin, report)
+
+        self.assertFalse(report.failed)
+
 
 class LayoutTests(unittest.TestCase):
     def setUp(self):

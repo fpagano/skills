@@ -795,6 +795,64 @@ def check_automatic_execution_files(pdir: Path, rep: Report):
                     fix="Remove this file. Community marketplace plugins are limited to user- or model-invoked components.")
 
 
+def hooks_declare_commands(value) -> bool:
+    """True for a hooks configuration that launches commands, in any shape the agent runtimes
+    accept: a file reference (string or list of strings), an inline object
+    (event -> entries -> hooks -> {command}), an entry with a direct command, or an array of
+    those objects. Covers Claude hooks.json, Codex inline and overlay hooks."""
+    if isinstance(value, str):
+        return True
+    if isinstance(value, list):
+        return any(hooks_declare_commands(v) for v in value)
+    if not isinstance(value, dict):
+        return False
+    for entries in value.values():
+        if not isinstance(entries, list):
+            entries = [entries]
+        for e in entries:
+            if not isinstance(e, dict):
+                continue
+            if e.get("command"):
+                return True
+            inner = e.get("hooks") or []
+            if not isinstance(inner, list):
+                inner = [inner]
+            for h in inner:
+                if isinstance(h, dict) and h.get("command"):
+                    return True
+    return False
+
+
+def check_component_configs(pdir: Path, rep: Report):
+    """Hook or command-MCP configuration in ANY JSON file, whatever its name: component
+    registration is content, not filename. The Codex overlay (`.codex-plugin/plugin.json`),
+    the portable `mcp.json` and hooks at custom paths all declare the same keys. The Claude
+    manifest (key-validated) and the literal `.mcp.json` (MCP commands checked in
+    scan_text_file) are handled separately."""
+    if not is_community_path(pdir):
+        return
+    for p in sorted(pdir.rglob("*.json")):
+        if p.is_symlink() or p.stat().st_size > MAX_FILE_BYTES:
+            continue
+        r = rel(p)
+        if p.relative_to(pdir).as_posix() in (".claude-plugin/plugin.json", ".mcp.json"):
+            continue
+        try:
+            data = json.loads(read_text(p))
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(data, dict):
+            continue
+        if hooks_declare_commands(data.get("hooks")):
+            rep.add("fail", "automatic-execution", f"`{r}` declares hook configuration.", file=r,
+                    fix="Community plugins cannot register hooks that execute automatically. Remove the file, or move "
+                        "user-invoked steps into the skill instructions or scripts.")
+        for sname, s in (data.get("mcpServers") or {}).items():
+            if isinstance(s, dict) and s.get("command"):
+                rep.add("fail", "mcp-command", f"`{r}` starts local MCP server `{sname}`.", file=r,
+                        fix="Remove the local `command` server. Use a declared HTTPS server, or keep it outside the plugin.")
+
+
 def check_manifest(rep: Report):
     """Validate the marketplace the merge would produce: render it from the plugin directories with
     `.github/scripts/marketplace.py`, refuse duplicate plugin names, then run `claude plugin validate` on that
@@ -889,6 +947,7 @@ def check_plugin(name: str, rep: Report):
                            perms_present=scope[4], where=scope[1], pdir=pdir, validated=validated)
     check_hooks(pdir, rep)
     check_automatic_execution_files(pdir, rep)
+    check_component_configs(pdir, rep)
 
 
 # --------------------------------------------------------------------------- output
