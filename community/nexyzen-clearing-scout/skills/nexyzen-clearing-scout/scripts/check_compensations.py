@@ -1,27 +1,28 @@
 #!/usr/bin/env python3
-"""check_compensations.py — List and accept clearing proposals from the Nexyzen engine.
+"""check_compensations.py — Read-only: list clearing proposals and fetch letters from Nexyzen.
 
 After submit_to_nexyzen.py has fed the ledger to the clearing network, the
 server-side engine periodically searches for closed cycles of mutual debts.
-This script lets the Qonto-side integration pull the results:
+This script lets the Qonto-side integration READ the results:
 
-  list    show the compensation proposals waiting for the user's acceptance
-  accept  accept one proposal by its one-time token (IRREVERSIBLE: it is the
-          legal consent to the voluntary set-off — always require an explicit
-          user confirmation first)
+  list     show the compensation proposals waiting for the user's decision
+  letters  fetch the credit-assignment letters of cycles that were completed
+
+It deliberately has NO way to accept a proposal. Accepting a compensation is a
+binding legal act (credit assignment with the assignor's warranties, art. 1266
+c.c.): only the user can do it, themselves, on the Nexyzen acceptance page
+that `list` points to. An agent must never accept, confirm declarations or
+attest warranties on the user's behalf.
 
 When every participant of a cycle has accepted, the cycle is finalized by the
-clearing house (credit-assignment letters) and the matched amounts are
-settled without any bank transfer. Invoices fully covered by a completed
-cycle can then be marked as paid in Qonto (mark_client_invoice_as_paid /
-change_supplier_invoice_status) — only with the user's explicit go-ahead.
+clearing house and the matched amounts are settled without any bank transfer.
 
 Credentials via environment (same as submit_to_nexyzen.py):
   NEXYZEN_AFFILIATE_CODE, NEXYZEN_TOKEN, NEXYZEN_BASE_URL (optional override)
 
 Usage:
   python check_compensations.py list --org-vat IT03671960833
-  python check_compensations.py accept --token <one-time token>
+  python check_compensations.py letters --org-vat IT03671960833
 """
 
 import argparse
@@ -36,24 +37,7 @@ except ImportError:
     pass
 
 DEFAULT_BASE_URL = "https://webapp.cameracompensazione.it/webservices/index.php"
-
-# Warranties the assignor makes on the assigned receivable. The engine requires
-# all of them (set to true) to accept, exactly as the public web form, and they
-# are reproduced in the deed of assignment (art. 1266 c.c.). They must come from
-# the user's explicit confirmation, never be forced by the integration.
-DECLARATIONS = [
-    ("riconoscimento_credito", "You hold the receivable you are assigning, towards your debtor."),
-    ("riconoscimento_debito", "You acknowledge the payable being offset."),
-    ("cessione_credito", "You assign the receivable to the assignee."),
-    ("ricezione_credito", "You accept the receivable you get in exchange."),
-    ("dich_esistenza", "The receivable exists, is certain, valid and due."),
-    ("dich_titolarita", "The receivable is solely yours and is not encumbered in favour of third parties."),
-    ("dich_non_pagato", "The receivable has not been paid, set off or otherwise extinguished."),
-    ("dich_non_contestato", "The receivable is not disputed, nor in any proceedings."),
-    ("dich_no_procedure", "You are not in insolvency proceedings and are not insolvent."),
-    ("dich_no_incedibilita", "The assignment breaches no non-assignment clause or contractual/legal restriction."),
-    ("dich_pro_soluto", "You acknowledge the terms of the operation (assignment without recourse, pro soluto)."),
-]
+ACCEPTANCE_PAGE = "https://webapp.cameracompensazione.it/attiva_compensazione.php?token="
 
 
 def post_json(url: str, payload: dict) -> dict:
@@ -109,29 +93,27 @@ def cmd_list(base_url: str, org_vat: str, as_json: bool, lang: str) -> int:
     })
     items = resp.get("compensazioni", [])
     if as_json:
+        # The one-time acceptance token is never handed to the agent.
+        for c in items:
+            c.pop("token", None)
         print(json.dumps(items, indent=2, ensure_ascii=False))
         return 0
     if not items:
-        print("No compensation proposal waiting for acceptance.")
+        print("No compensation proposal waiting for a decision.")
         return 0
-    print(f"{len(items)} compensation proposal(s) waiting for acceptance:")
+    print(f"{len(items)} compensation proposal(s) waiting for the user's decision:")
     for c in items:
         print(f"\n#{c['id_compensazione']} — cycle {c['id_ciclo']} — EUR {c['importo']:.2f}")
-        missing = c.get("anagrafica_mancante") or []
-        if missing:
-            print(f"  REGISTRY DATA REQUIRED before accepting ({len(missing)} field(s)): "
-                  + ", ".join(missing))
-            print("    collect them from the user and pass each as --set field=value on accept")
-        print(f"  You assign a EUR {c['importo']:.2f} receivable towards "
+        print(f"  The user would assign a EUR {c['importo']:.2f} receivable towards "
               f"{c['credito_verso']['ragione_sociale']} (VAT {c['credito_verso']['partita_iva']})")
         print(f"    from invoices: {fmt_invoices(c['credito_verso']['fatture'])}")
-        print(f"  In exchange your debt towards {c['debito_verso']['ragione_sociale']} "
+        print(f"  In exchange their debt towards {c['debito_verso']['ragione_sociale']} "
               f"(VAT {c['debito_verso']['partita_iva']}) is settled for the same amount")
         print(f"    covering: {fmt_invoices(c['debito_verso']['fatture'])}")
         print(f"  Legal basis: {c['base_legale']}")
-        print(f"  Acceptance token: {c['token']}")
-    print("\nTo accept (after explicit user confirmation):")
-    print("  python check_compensations.py accept --token <token>")
+    print("\nThe agent cannot accept. Accepting is a binding legal act that only the user "
+          "can perform, on the Nexyzen acceptance page linked in the notification they "
+          f"received (format: {ACCEPTANCE_PAGE}<token>).")
     return 0
 
 
@@ -159,68 +141,14 @@ def cmd_letters(base_url: str, org_vat: str, include_delivered: bool, as_json: b
     return 0
 
 
-def cmd_accept(base_url: str, token: str, registry_fields: list, lang: str,
-               confirm_declarations: bool) -> int:
-    # Accepting attaches the assignor's warranties (art. 1266 c.c.): the engine
-    # rejects the acceptance without them, and the integration must not attest
-    # them on the user's behalf. Show them and refuse until the user has read and
-    # confirmed them (re-run with --confirm-declarations).
-    if not confirm_declarations:
-        print("Before accepting, the assignor makes these declarations on the "
-              "assigned receivable:\n")
-        for _key, text in DECLARATIONS:
-            print(f"  - {text}")
-        print("\nPresent them to the user. Only after an explicit confirmation, "
-              "re-run this command adding --confirm-declarations.", file=sys.stderr)
-        return 2
-
-    jwt = get_jwt(base_url)
-    dati = {
-        "token": token,
-        "lingua": lang,
-        "dichiarazioni": {key: True for key, _text in DECLARATIONS},
-    }
-    if registry_fields:
-        anagrafica = {}
-        for pair in registry_fields:
-            if "=" not in pair:
-                print(f"--set expects field=value, got: {pair}", file=sys.stderr)
-                return 1
-            k, v = pair.split("=", 1)
-            anagrafica[k.strip()] = v.strip()
-        dati["anagrafica"] = anagrafica
-    resp = post_json(base_url, {
-        "op": "accetta_compensazione",
-        "jwt": jwt,
-        "dati": dati,
-    })
-    print(json.dumps(resp, indent=2, ensure_ascii=False))
-    if resp.get("ciclo_completo"):
-        print("\nAll participants have accepted: the cycle is complete. "
-              "The clearing house will issue the credit-assignment letters; "
-              "invoices fully covered by the cycle can be marked as paid in Qonto.")
-    elif resp.get("accepted"):
-        print("\nAccepted. The cycle settles once the remaining participants accept too.")
-    return 0 if resp.get("accepted") else 1
-
-
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--lang", choices=["en", "it"], default="en",
                     help="language of engine messages and legal-basis labels (default: en)")
     sub = ap.add_subparsers(dest="cmd", required=True)
-    p_list = sub.add_parser("list", help="list pending compensation proposals")
+    p_list = sub.add_parser("list", help="list pending compensation proposals (read-only)")
     p_list.add_argument("--org-vat", required=True, help="VAT of the organization (as submitted)")
     p_list.add_argument("--json", action="store_true", help="raw JSON output")
-    p_accept = sub.add_parser("accept", help="accept a proposal by token (requires user confirmation)")
-    p_accept.add_argument("--token", required=True, help="one-time acceptance token")
-    p_accept.add_argument("--set", action="append", default=[], metavar="FIELD=VALUE",
-                          help="registry (anagrafica) field to record with the acceptance; "
-                               "repeatable — e.g. --set nome_legale_rappresentante=Mario")
-    p_accept.add_argument("--confirm-declarations", action="store_true",
-                          help="attest, on the user's behalf and only after their explicit "
-                               "consent, the assignor's warranties on the assigned receivable "
-                               "(art. 1266 c.c.); required to accept")
     p_letters = sub.add_parser("letters", help="fetch credit-assignment letters delivered to the Qonto channel")
     p_letters.add_argument("--org-vat", required=True, help="VAT of the organization (as submitted)")
     p_letters.add_argument("--all", action="store_true", help="include letters already delivered")
@@ -230,9 +158,7 @@ def main() -> int:
     base_url = os.environ.get("NEXYZEN_BASE_URL", DEFAULT_BASE_URL)
     if args.cmd == "list":
         return cmd_list(base_url, args.org_vat, args.json, args.lang)
-    if args.cmd == "letters":
-        return cmd_letters(base_url, args.org_vat, args.all, args.json, args.lang)
-    return cmd_accept(base_url, args.token, args.set, args.lang, args.confirm_declarations)
+    return cmd_letters(base_url, args.org_vat, args.all, args.json, args.lang)
 
 
 if __name__ == "__main__":

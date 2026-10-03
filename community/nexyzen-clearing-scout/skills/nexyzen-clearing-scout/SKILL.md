@@ -8,7 +8,13 @@ description: >
   drafts a legally grounded set-off proposal. Use when the user asks about
   frozen working capital, unpaid/overdue invoices, offsetting debts with a
   counterparty, invoice clearing, netting, or "compensazione" of receivables
-  and payables.
+  and payables. DISCLOSURE: by default everything stays local (read-only on
+  Qonto, deterministic scripts). Only if the user explicitly asks and
+  confirms the exact list, it can transmit open-invoice data (pseudonymized
+  VAT numbers, invoice numbers, dates, amounts) to Nexyzen, a third-party
+  clearing service run by Camera di Compensazione S.r.l., not by Qonto. The
+  agent can never accept a compensation or make any legal declaration: that
+  binding step is performed by the user themselves on Nexyzen's own page.
 permissions:
   mcp:
     qonto: [change_supplier_invoice_status, get_organization, list_client_invoices, list_supplier_invoices, mark_client_invoice_as_paid]
@@ -34,6 +40,31 @@ See `references/methodology.md` for definitions and how to read each report.
 This skill never initiates payments, transfers, or any money movement. The
 only write action it may perform on Qonto — marking an invoice as paid after
 a completed set-off — requires explicit user confirmation first.
+
+## What leaves Qonto, and what you must never do
+
+Steps 1-4 are local: data is read from Qonto and processed by scripts on the
+user's machine; nothing is sent anywhere.
+
+There are exactly two points where a third party is involved, and both need
+the user's explicit, informed yes:
+
+1. **Submission (step 5)** transmits business and fiscal data to Nexyzen, an
+   external service operated by Camera di Compensazione S.r.l. Before running
+   it you MUST show the user the dry-run list (every invoice, counterparty
+   pseudonym, amount) and say plainly that it goes to a third party that is
+   not Qonto. Send only after the user confirms that list, and drop any
+   invoice they exclude.
+2. **Acceptance of a compensation (step 6)** is a binding legal act: a credit
+   assignment with the assignor's warranties (art. 1266 c.c.). **You must
+   never accept a compensation, confirm declarations, attest warranties, or
+   fill in legal-representative data on the user's behalf.** This skill has no
+   command for it on purpose. You present the proposal and the user decides,
+   on their own, on the Nexyzen acceptance page.
+
+Never pass `--send` on your own initiative, never reuse an earlier "yes" for a
+different batch, and never treat the user's request to "check" or "look at"
+their positions as consent to submit anything.
 
 ## Workflow
 
@@ -111,18 +142,26 @@ Italian Civil Code with equivalent references for FR/DE/ES.
 **Submit to the clearing network (optional, explicit confirmation required).**
 There is no button or menu for this anywhere — the only way it happens is a
 user asking for it, or you proposing it and the user agreeing. This is the
-moment data leaves the machine: before running the command below, tell the
-user what you are about to send (which invoices, and that VAT numbers are
-pseudonymized by default) and wait for an explicit yes.
+moment business and fiscal data leaves the machine, toward a third party that
+is not Qonto. Two steps, always in this order:
+
+1. Run the preview (this is the default, it sends nothing):
 
 ```
 python scripts/submit_to_nexyzen.py --ledger ledger.json \
     --org-vat <ORG_VAT> --email <user email>
 ```
 
-Requires `NEXYZEN_AFFILIATE_CODE` and `NEXYZEN_TOKEN` environment variables
-(without them it dry-runs). VAT numbers are pseudonymized with SHA-256 by
-default before leaving the machine.
+2. Show the user the full list, invoice by invoice (number, counterparty
+   pseudonym, amount), and state plainly: this data would be sent to Nexyzen,
+   a service operated by Camera di Compensazione S.r.l.; VAT numbers are
+   pseudonymized with SHA-256; no payment is initiated. Ask whether to send
+   it, and which invoices to leave out. Only after an explicit yes, re-run
+   the same command adding `--send` (and `--exclude-invoice <number>` for
+   every invoice they dropped).
+
+Sending requires `NEXYZEN_AFFILIATE_CODE` and `NEXYZEN_TOKEN` in the
+environment; without them, or without `--send`, nothing is transmitted.
 
 **Set expectations on timing.** Submitting does not return an instant
 answer. Bilateral matches (step 3) are already visible from the user's own
@@ -145,38 +184,20 @@ python scripts/check_compensations.py list --org-vat <ORG_VAT>
 Present each proposal in plain terms: which receivable is assigned, which
 debt gets settled, the amount, the legal basis.
 
-**Registry completion.** Acceptance legally requires complete company
-records (company data plus legal-representative details, used in the
-credit-assignment letters). The `list` output reports any missing field in
-`anagrafica_mancante`. Pre-fill what Qonto already knows (`get_organization`
-for legal name and address) and ask the user only for the rest — typically
-the legal representative's name, fiscal code, role, place and date of birth.
-Pass each value with `--set field=value` on accept; the engine refuses the
-acceptance until the mandatory fields are complete.
+**The agent stops here.** Accepting a compensation is a binding legal act:
+the user assigns a receivable and makes warranties on it (art. 1266 c.c.),
+and it cannot be undone. This skill therefore has no command to accept, and
+you must not try to accept, confirm declarations or enter
+legal-representative data in any other way. Tell the user that the proposal
+is theirs to accept or ignore, and that they do it themselves on the Nexyzen
+acceptance page linked in the notification they received, where the full
+declarations and the company registry form are shown to them. Offer to help
+them *understand* the proposal (amounts, counterparties, legal basis), never
+to complete it for them.
 
-**Accepting is the user's legal consent to the set-off and is
-irreversible** — never call `accept` without an explicit confirmation for
-that specific proposal.
-
-Accepting also attaches the assignor's warranties on the assigned receivable
-(art. 1266 c.c.): the receivable exists and is due, is solely theirs and
-unencumbered, unpaid and undisputed, and the assignment is pro soluto (without
-recourse). The engine requires all of them and rejects the acceptance without
-them. Run `accept` first **without** `--confirm-declarations`: it prints the
-declarations and stops. Show them to the user, and only after their explicit
-consent re-run with `--confirm-declarations` — never confirm on their behalf.
-
-```
-python scripts/check_compensations.py accept --token <one-time token>
-# prints the declarations and exits; then, after the user confirms:
-python scripts/check_compensations.py accept --token <one-time token> \
-    --confirm-declarations \
-    [--set nome_legale_rappresentante=... --set cf_legale_rappresentante=... ...]
-```
-
-When the response says the cycle is complete (every participant accepted),
-the clearing house finalizes it and delivers the credit-assignment letters
-to the Qonto channel instead of PEC mail. Fetch them with:
+When every participant of a cycle has accepted, the clearing house finalizes
+it and delivers the credit-assignment letters to the Qonto channel instead of
+PEC mail. Fetch them (read-only) with:
 
 ```
 python scripts/check_compensations.py letters --org-vat <ORG_VAT> [--json]

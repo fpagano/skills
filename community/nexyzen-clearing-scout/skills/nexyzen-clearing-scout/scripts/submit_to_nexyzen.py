@@ -19,12 +19,20 @@ Credentials come from environment variables and are NEVER stored in the repo:
   NEXYZEN_TOKEN            API token
   NEXYZEN_BASE_URL         optional override of the API base URL
 
-Without credentials the script runs in DRY-RUN mode and prints the payloads
-it would send.
+THIRD-PARTY TRANSMISSION: this script sends, for each open invoice, the
+(pseudonymized) VAT numbers of both parties, invoice number, date, total and
+open amount, plus an optional notification email, to Nexyzen — a service
+operated by Camera di Compensazione S.r.l., not by Qonto.
+
+The default is DRY RUN: it only prints what would be sent. Nothing is
+transmitted unless --send is passed, which an agent must do only after the
+user has seen the exact list and explicitly confirmed it. The user can drop
+single invoices with --exclude-invoice.
 
 Usage:
   python submit_to_nexyzen.py --ledger ledger.json --org-vat IT03671960833 \
-      [--email you@company.com] [--dry-run] [--no-pseudonymize]
+      [--email you@company.com] [--exclude-invoice 2026/012 ...] \
+      [--no-pseudonymize] [--send]
 """
 
 import argparse
@@ -110,7 +118,12 @@ def main() -> int:
     ap.add_argument("--ledger", required=True, help="ledger.json from build_ledger.py")
     ap.add_argument("--org-vat", required=True, help="VAT number of the Qonto organization")
     ap.add_argument("--email", default=None, help="notification email for clearing proposals")
-    ap.add_argument("--dry-run", action="store_true", help="print payloads, send nothing")
+    ap.add_argument("--send", action="store_true",
+                    help="actually transmit the invoices to Nexyzen. Without this flag the "
+                         "script only prints what WOULD be sent (default). Use it only after "
+                         "the user has seen that list and explicitly said yes")
+    ap.add_argument("--exclude-invoice", action="append", default=[], metavar="NUMBER",
+                    help="invoice number the user does not want to send (repeatable)")
     ap.add_argument("--no-pseudonymize", action="store_true",
                     help="send clear VAT numbers instead of SHA-256 pseudonyms")
     ap.add_argument("--default-country", default=None,
@@ -123,6 +136,8 @@ def main() -> int:
     payloads = build_payloads(ledger, args.org_vat, args.email,
                               do_pseudonymize=not args.no_pseudonymize,
                               default_country=args.default_country)
+    excluded = set(args.exclude_invoice)
+    payloads = [p for p in payloads if p.get("numero_fattura") not in excluded]
     print(f"{len(payloads)} open invoice(s) ready for the clearing engine "
           f"({'pseudonymized' if not args.no_pseudonymize else 'CLEAR'} VAT numbers).")
 
@@ -130,11 +145,18 @@ def main() -> int:
     token = os.environ.get("NEXYZEN_TOKEN")
     base_url = os.environ.get("NEXYZEN_BASE_URL", DEFAULT_BASE_URL)
 
-    if args.dry_run or not (affiliate and token):
-        if not (affiliate and token):
-            print("NEXYZEN_AFFILIATE_CODE / NEXYZEN_TOKEN not set -> DRY RUN.")
+    # Default is DRY RUN: nothing leaves the machine unless --send is given AND
+    # credentials are configured.
+    if not args.send or not (affiliate and token):
+        print("DRY RUN — nothing has been sent. This is exactly what would be transmitted "
+              "to the Nexyzen clearing service:")
         for p in payloads:
             print(json.dumps(p, ensure_ascii=False))
+        if args.send:
+            print("--send was given but NEXYZEN_AFFILIATE_CODE / NEXYZEN_TOKEN are not set.",
+                  file=sys.stderr)
+        else:
+            print("To transmit, the user must first confirm this list; then re-run with --send.")
         return 0
 
     print(f"Connecting to {base_url} ...")
