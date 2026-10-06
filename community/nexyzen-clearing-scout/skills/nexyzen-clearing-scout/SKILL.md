@@ -11,7 +11,7 @@ description: >
   Compensazione S.r.l., not by Qonto. (1) Submission sends open-invoice data
   with both parties' VAT numbers IN CLEAR (clearing matches companies by VAT),
   plus invoice numbers, dates and amounts: it shares your counterparties' data
-  with a third party. A hashed mode is demo-only, not anonymous. The user
+  with a third party; there is no anonymous mode. The user
   must type a confirmation on their own terminal. (2) Looking up proposals
   sends your organization's VAT in clear. The agent can never accept a
   compensation or make legal declarations: the user does it on Nexyzen's page.
@@ -55,10 +55,10 @@ Camera di Compensazione S.r.l., not by Qonto) is involved:
    not Qonto, and that it includes the VAT numbers, invoice numbers and
    amounts of the user's counterparties, who did not agree to it. VAT
    numbers go in clear because the clearing engine matches companies by VAT;
-   without them it cannot find cycles. A hashed mode (`--pseudonymize`) exists
-   for demos only: it is **not anonymization** (VAT numbers are public, so
-   the hashes can be reversed) and it cannot match real counterparties, so do
-   not offer it as a privacy measure. The script itself makes the user type a
+   without them it cannot find cycles. There is no anonymous or hashed mode,
+   on purpose: VAT numbers are public, so a hash would only suggest a
+   protection that does not exist. Never describe the submission as
+   anonymized or pseudonymized. The script itself makes the user type a
    confirmation on their own terminal; it cannot be answered by you, and if
    no terminal is available you must tell the user to run the command
    themselves.

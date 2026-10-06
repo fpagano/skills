@@ -12,11 +12,11 @@ Flow (see swagger: /webservices/index.php):
 VAT numbers are sent IN CLEAR, together with invoice numbers, dates and amounts
 of THIRD PARTIES (your counterparties), who have not agreed to any of it. That
 is not optional polish: the clearing engine matches companies by VAT number, so
-without clear VAT numbers it cannot find cycles across the network. A hashed
-mode exists (--pseudonymize) for demos only: it is NOT anonymization, since VAT
-numbers are public and the hash can be reversed by hashing candidates, and it
-cannot match companies that are not submitted in the same hashed form. No
-payment is ever initiated: the engine only detects offset opportunities.
+without clear VAT numbers it cannot find cycles across the network. There is no
+hashed or "anonymous" mode on purpose: VAT numbers are public, a hash of them
+is trivially reversible and would only suggest a protection that does not
+exist. No payment is ever initiated: the engine only detects offset
+opportunities.
 
 Credentials come from plain environment variables and are NEVER stored in the repo:
   NEXYZEN_AFFILIATE_CODE   affiliate code (from commerciale@cameracompensazione.it)
@@ -24,9 +24,9 @@ Credentials come from plain environment variables and are NEVER stored in the re
   NEXYZEN_BASE_URL         optional override of the API base URL
 
 THIRD-PARTY TRANSMISSION: this script sends, for each open invoice, the VAT
-numbers of both parties (in clear; hashed only with --pseudonymize), invoice
-number, date, total and open amount, plus an optional notification email, to
-Nexyzen — a service operated by Camera di Compensazione S.r.l., not by Qonto.
+numbers of both parties (in clear), invoice number, date, total and open
+amount, plus an optional notification email, to Nexyzen — a service operated
+by Camera di Compensazione S.r.l., not by Qonto.
 
 The default is DRY RUN: it only prints what would be sent. With --send the
 script additionally asks for a typed confirmation on the user's own terminal
@@ -36,11 +36,10 @@ refuses and tells the user to run the command themselves.
 Usage:
   python submit_to_nexyzen.py --ledger ledger.json --org-vat IT03671960833 \
       [--email you@company.com] [--exclude-invoice 2026/012 ...] \
-      [--default-country IT] [--pseudonymize] [--send]
+      [--default-country IT] [--send]
 """
 
 import argparse
-import hashlib
 import json
 import os
 import sys
@@ -76,17 +75,6 @@ def confirm_on_user_terminal(expected: str) -> bool | None:
     return result[0] if result else None
 
 
-def pseudonymize(vat: str) -> str:
-    """Deterministic pseudonym: same VAT -> same token.
-
-    Demo mode only (--pseudonymize). This is NOT anonymization: VAT numbers are
-    public and low-entropy, so the hash can be reversed by hashing candidate
-    numbers. Treat it as a light obfuscation, not as protection of the
-    counterparties' identity.
-    """
-    return "PS" + hashlib.sha256(vat.encode("utf-8")).hexdigest()[:20].upper()
-
-
 def post_json(url: str, payload: dict) -> dict:
     req = urllib.request.Request(
         url,
@@ -99,15 +87,15 @@ def post_json(url: str, payload: dict) -> dict:
 
 
 def build_payloads(ledger: dict, org_vat: str, email: str | None,
-                   do_pseudonymize: bool, default_country: str | None = None) -> list[dict]:
+                   default_country: str | None = None) -> list[dict]:
     """Map every open ledger invoice to a /send_manual 'dati' payload.
 
     Counterparties without a VAT number are skipped (with a warning): the
     clearing engine matches on VAT and cannot use name-only records.
-    When sending clear VAT numbers, the country prefix seen in the source
-    data is restored ('IT01...'), falling back to --default-country.
+    The country prefix seen in the source data is restored ('IT01...'),
+    falling back to --default-country.
     """
-    org_id = pseudonymize(org_vat) if do_pseudonymize else org_vat
+    org_id = org_vat
     payloads = []
     for cp in ledger["counterparties"]:
         cp_vat = cp["vat"] or ""
@@ -117,11 +105,8 @@ def build_payloads(ledger: dict, org_vat: str, email: str | None,
                 print(f"SKIP {cp.get('canonical_name')}: no VAT number "
                       f"({open_count} open invoice(s) not submitted)", file=sys.stderr)
             continue
-        if do_pseudonymize:
-            cp_id = pseudonymize(cp_vat)
-        else:
-            country = cp.get("vat_country") or default_country or ""
-            cp_id = country + cp_vat
+        country = cp.get("vat_country") or default_country or ""
+        cp_id = country + cp_vat
         for inv in cp["invoices"]:
             open_amount = float(inv["open_amount"])
             if open_amount <= 0:
@@ -155,25 +140,19 @@ def main() -> int:
                          "the user has seen that list and explicitly said yes")
     ap.add_argument("--exclude-invoice", action="append", default=[], metavar="NUMBER",
                     help="invoice number the user does not want to send (repeatable)")
-    ap.add_argument("--pseudonymize", action="store_true",
-                    help="DEMO ONLY: hash VAT numbers with SHA-256 instead of sending them in "
-                         "clear. Not anonymization (VAT numbers are public, the hash is "
-                         "reversible) and it cannot match companies outside the same hashed "
-                         "submissions, so it is useless for real clearing")
     ap.add_argument("--default-country", default=None,
-                    help="country prefix for VAT numbers that lack one (e.g. IT); clear mode only")
+                    help="country prefix for VAT numbers that lack one (e.g. IT)")
     args = ap.parse_args()
 
     with open(args.ledger, encoding="utf-8") as f:
         ledger = json.load(f)
 
     payloads = build_payloads(ledger, args.org_vat, args.email,
-                              do_pseudonymize=args.pseudonymize,
                               default_country=args.default_country)
     excluded = set(args.exclude_invoice)
     payloads = [p for p in payloads if p.get("numero_fattura") not in excluded]
     print(f"{len(payloads)} open invoice(s) ready for the clearing engine "
-          f"({'hashed (demo only)' if args.pseudonymize else 'CLEAR'} VAT numbers).")
+          f"(VAT numbers in CLEAR).")
 
     affiliate = os.environ.get("NEXYZEN_AFFILIATE_CODE")
     token = os.environ.get("NEXYZEN_TOKEN")
@@ -194,11 +173,10 @@ def main() -> int:
         return 0
 
     # --send: the user must confirm on their own terminal. An agent cannot do it.
-    if not args.pseudonymize:
-        print("WARNING: VAT numbers, invoice numbers, dates and amounts of your "
-              "counterparties (third parties who have not agreed to this) will be sent "
-              "to Nexyzen IN CLEAR.", file=sys.stderr)
-    phrase = f"SEND {len(payloads)} INVOICES" + ("" if args.pseudonymize else " IN CLEAR")
+    print("WARNING: VAT numbers, invoice numbers, dates and amounts of your "
+          "counterparties (third parties who have not agreed to this) will be sent "
+          "to Nexyzen IN CLEAR.", file=sys.stderr)
+    phrase = f"SEND {len(payloads)} INVOICES IN CLEAR"
     answer = confirm_on_user_terminal(phrase)
     if answer is None:
         print("REFUSED: no interactive terminal available. Sending needs the user to type a "

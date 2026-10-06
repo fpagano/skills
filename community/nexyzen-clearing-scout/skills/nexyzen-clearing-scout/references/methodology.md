@@ -64,10 +64,9 @@ confirmation by the user on their own terminal. They go to Nexyzen, a service
 operated by Camera di Compensazione S.r.l., not by Qonto, with VAT numbers in
 clear: the engine matches companies by VAT number, so without them it cannot
 find cycles. That includes the VAT numbers, invoice numbers and amounts of
-the user's counterparties. A hashed mode (`--pseudonymize`, SHA-256, `PS`
-prefix) exists for demos only: it is NOT anonymous, since VAT numbers are
-public and the hash can be reversed, and it cannot match companies outside the
-same hashed submissions. Credentials live in environment variables, never in
+the user's counterparties. There is no hashed or anonymous mode on purpose:
+VAT numbers are public, so a hash is trivially reversible and would only
+suggest a protection that does not exist. Credentials live in environment variables, never in
 files. The engine only *detects* offsets — no payment is ever initiated, on
 Qonto or anywhere else.
 
