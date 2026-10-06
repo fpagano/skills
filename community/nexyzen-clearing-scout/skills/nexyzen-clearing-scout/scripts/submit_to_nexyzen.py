@@ -9,12 +9,14 @@ Flow (see swagger: /webservices/index.php):
   1. POST /connect     (op "gjwt")        -> 1-hour JWT
   2. POST /send_manual (op "ins_manuale") -> one call per open invoice
 
-Pseudonymization is NOT anonymization: by default VAT numbers are replaced by
-a SHA-256 token, but VAT numbers are public and easy to enumerate, so the
-token can be reversed by hashing candidates. --no-pseudonymize sends the VAT
-numbers in clear, together with invoice numbers, dates and amounts of THIRD
-PARTIES (your counterparties), who have not agreed to any of it. No payment is
-ever initiated: the engine only detects offset opportunities.
+VAT numbers are sent IN CLEAR, together with invoice numbers, dates and amounts
+of THIRD PARTIES (your counterparties), who have not agreed to any of it. That
+is not optional polish: the clearing engine matches companies by VAT number, so
+without clear VAT numbers it cannot find cycles across the network. A hashed
+mode exists (--pseudonymize) for demos only: it is NOT anonymization, since VAT
+numbers are public and the hash can be reversed by hashing candidates, and it
+cannot match companies that are not submitted in the same hashed form. No
+payment is ever initiated: the engine only detects offset opportunities.
 
 Credentials come from plain environment variables and are NEVER stored in the repo:
   NEXYZEN_AFFILIATE_CODE   affiliate code (from commerciale@cameracompensazione.it)
@@ -22,10 +24,9 @@ Credentials come from plain environment variables and are NEVER stored in the re
   NEXYZEN_BASE_URL         optional override of the API base URL
 
 THIRD-PARTY TRANSMISSION: this script sends, for each open invoice, the VAT
-numbers of both parties (pseudonymized, or in clear with --no-pseudonymize),
-invoice number, date, total and open amount, plus an optional notification
-email, to Nexyzen — a service operated by Camera di Compensazione S.r.l., not
-by Qonto.
+numbers of both parties (in clear; hashed only with --pseudonymize), invoice
+number, date, total and open amount, plus an optional notification email, to
+Nexyzen — a service operated by Camera di Compensazione S.r.l., not by Qonto.
 
 The default is DRY RUN: it only prints what would be sent. With --send the
 script additionally asks for a typed confirmation on the user's own terminal
@@ -35,7 +36,7 @@ refuses and tells the user to run the command themselves.
 Usage:
   python submit_to_nexyzen.py --ledger ledger.json --org-vat IT03671960833 \
       [--email you@company.com] [--exclude-invoice 2026/012 ...] \
-      [--no-pseudonymize] [--send]
+      [--default-country IT] [--pseudonymize] [--send]
 """
 
 import argparse
@@ -78,9 +79,10 @@ def confirm_on_user_terminal(expected: str) -> bool | None:
 def pseudonymize(vat: str) -> str:
     """Deterministic pseudonym: same VAT -> same token.
 
-    This is NOT anonymization: VAT numbers are public and low-entropy, so the
-    hash can be reversed by hashing candidate numbers. Treat it as a light
-    obfuscation, not as protection of the counterparties' identity.
+    Demo mode only (--pseudonymize). This is NOT anonymization: VAT numbers are
+    public and low-entropy, so the hash can be reversed by hashing candidate
+    numbers. Treat it as a light obfuscation, not as protection of the
+    counterparties' identity.
     """
     return "PS" + hashlib.sha256(vat.encode("utf-8")).hexdigest()[:20].upper()
 
@@ -153,10 +155,11 @@ def main() -> int:
                          "the user has seen that list and explicitly said yes")
     ap.add_argument("--exclude-invoice", action="append", default=[], metavar="NUMBER",
                     help="invoice number the user does not want to send (repeatable)")
-    ap.add_argument("--no-pseudonymize", action="store_true",
-                    help="send VAT numbers in clear instead of SHA-256 pseudonyms. This shares "
-                         "your counterparties' VAT numbers, invoice numbers and amounts with a "
-                         "third party; the user must understand this before choosing it")
+    ap.add_argument("--pseudonymize", action="store_true",
+                    help="DEMO ONLY: hash VAT numbers with SHA-256 instead of sending them in "
+                         "clear. Not anonymization (VAT numbers are public, the hash is "
+                         "reversible) and it cannot match companies outside the same hashed "
+                         "submissions, so it is useless for real clearing")
     ap.add_argument("--default-country", default=None,
                     help="country prefix for VAT numbers that lack one (e.g. IT); clear mode only")
     args = ap.parse_args()
@@ -165,12 +168,12 @@ def main() -> int:
         ledger = json.load(f)
 
     payloads = build_payloads(ledger, args.org_vat, args.email,
-                              do_pseudonymize=not args.no_pseudonymize,
+                              do_pseudonymize=args.pseudonymize,
                               default_country=args.default_country)
     excluded = set(args.exclude_invoice)
     payloads = [p for p in payloads if p.get("numero_fattura") not in excluded]
     print(f"{len(payloads)} open invoice(s) ready for the clearing engine "
-          f"({'pseudonymized' if not args.no_pseudonymize else 'CLEAR'} VAT numbers).")
+          f"({'hashed (demo only)' if args.pseudonymize else 'CLEAR'} VAT numbers).")
 
     affiliate = os.environ.get("NEXYZEN_AFFILIATE_CODE")
     token = os.environ.get("NEXYZEN_TOKEN")
@@ -191,11 +194,11 @@ def main() -> int:
         return 0
 
     # --send: the user must confirm on their own terminal. An agent cannot do it.
-    if args.no_pseudonymize:
-        print("WARNING: CLEAR mode. VAT numbers, invoice numbers, dates and amounts of "
-              "your counterparties (third parties) will be sent to Nexyzen in clear.",
-              file=sys.stderr)
-    phrase = f"SEND {len(payloads)} INVOICES" + (" IN CLEAR" if args.no_pseudonymize else "")
+    if not args.pseudonymize:
+        print("WARNING: VAT numbers, invoice numbers, dates and amounts of your "
+              "counterparties (third parties who have not agreed to this) will be sent "
+              "to Nexyzen IN CLEAR.", file=sys.stderr)
+    phrase = f"SEND {len(payloads)} INVOICES" + ("" if args.pseudonymize else " IN CLEAR")
     answer = confirm_on_user_terminal(phrase)
     if answer is None:
         print("REFUSED: no interactive terminal available. Sending needs the user to type a "

@@ -59,10 +59,15 @@ the algorithm is not part of this public skill.
 
 ## Privacy (submit_to_nexyzen.py)
 
-Ledger rows leave the machine only on explicit request, with VAT numbers
-pseudonymized (SHA-256, first 20 hex chars, `PS` prefix) by default:
-the same VAT always maps to the same token, so matching still works, but the
-token is NOT anonymous: VAT numbers are public, so the hash can be reversed. Credentials live in environment variables, never in
+Ledger rows leave the machine only on explicit request, and a typed
+confirmation by the user on their own terminal. They go to Nexyzen, a service
+operated by Camera di Compensazione S.r.l., not by Qonto, with VAT numbers in
+clear: the engine matches companies by VAT number, so without them it cannot
+find cycles. That includes the VAT numbers, invoice numbers and amounts of
+the user's counterparties. A hashed mode (`--pseudonymize`, SHA-256, `PS`
+prefix) exists for demos only: it is NOT anonymous, since VAT numbers are
+public and the hash can be reversed, and it cannot match companies outside the
+same hashed submissions. Credentials live in environment variables, never in
 files. The engine only *detects* offsets — no payment is ever initiated, on
 Qonto or anywhere else.
 

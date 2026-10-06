@@ -9,11 +9,11 @@ description: >
   DISCLOSURE: Qonto is only read, never written to; analysis is local. Two
   optional steps contact Nexyzen, a third-party service run by Camera di
   Compensazione S.r.l., not by Qonto. (1) Submission sends open-invoice data
-  (both parties' VAT numbers, invoice numbers, dates, amounts), pseudonymized
-  by default, which is NOT anonymous since VAT numbers are public; an optional
-  clear mode shares counterparties' data in full. The user must type a
-  confirmation on their own terminal. (2) Looking up proposals sends your
-  organization's VAT number in clear. The agent can never accept a
+  with both parties' VAT numbers IN CLEAR (clearing matches companies by VAT),
+  plus invoice numbers, dates and amounts: it shares your counterparties' data
+  with a third party. A hashed mode is demo-only, not anonymous. The user
+  must type a confirmation on their own terminal. (2) Looking up proposals
+  sends your organization's VAT in clear. The agent can never accept a
   compensation or make legal declarations: the user does it on Nexyzen's page.
 permissions:
   mcp:
@@ -51,15 +51,17 @@ Camera di Compensazione S.r.l., not by Qonto) is involved:
 
 1. **Submission (step 5)** transmits business and fiscal data. Before running
    it you MUST show the user the dry-run list (every invoice, counterparty
-   pseudonym, amount) and say plainly that it goes to a third party that is
-   not Qonto. The VAT pseudonyms are SHA-256 hashes, which is **not
-   anonymization**: VAT numbers are public, so the hashes can be reversed. The
-   `--no-pseudonymize` mode sends the counterparties' VAT numbers, invoice
-   numbers and amounts in clear; offer it only if the user asks, and tell
-   them it shares data of third parties who did not agree to it. The
-   script itself makes the user type a confirmation on their own terminal;
-   it cannot be answered by you, and if no terminal is available you must
-   tell the user to run the command themselves.
+   VAT number, amount) and say plainly that it goes to a third party that is
+   not Qonto, and that it includes the VAT numbers, invoice numbers and
+   amounts of the user's counterparties, who did not agree to it. VAT
+   numbers go in clear because the clearing engine matches companies by VAT;
+   without them it cannot find cycles. A hashed mode (`--pseudonymize`) exists
+   for demos only: it is **not anonymization** (VAT numbers are public, so
+   the hashes can be reversed) and it cannot match real counterparties, so do
+   not offer it as a privacy measure. The script itself makes the user type a
+   confirmation on their own terminal; it cannot be answered by you, and if
+   no terminal is available you must tell the user to run the command
+   themselves.
 2. **Lookups (step 6)**: `list` and `letters` send the organization's VAT
    number in clear to Nexyzen. Say so before the first call.
 3. **Acceptance of a compensation (step 6)** is a binding legal act: a credit
@@ -160,12 +162,14 @@ python scripts/submit_to_nexyzen.py --ledger ledger.json \
 ```
 
 2. Show the user the full list, invoice by invoice (number, counterparty
-   pseudonym, amount), and state plainly: this data would be sent to Nexyzen,
-   a service operated by Camera di Compensazione S.r.l.; VAT numbers are
-   pseudonymized with SHA-256; no payment is initiated. Ask whether to send
-   it, and which invoices to leave out. Only after an explicit yes, re-run
-   the same command adding `--send` (and `--exclude-invoice <number>` for
-   every invoice they dropped).
+   VAT number, amount), and state plainly: this data would be sent in clear
+   to Nexyzen, a service operated by Camera di Compensazione S.r.l., not by
+   Qonto; it includes data of the user's counterparties; no payment is
+   initiated. Ask whether to send it, and which invoices to leave out. Only
+   after an explicit yes, re-run the same command adding `--send` (and
+   `--exclude-invoice <number>` for every invoice they dropped). Pass
+   `--default-country IT` (or the right prefix) if the ledger's VAT numbers
+   lack their country prefix.
 
 With `--send`, the script then asks the user to type a confirmation phrase
 on **their own terminal**, not on stdin, so you cannot answer it for them. If
