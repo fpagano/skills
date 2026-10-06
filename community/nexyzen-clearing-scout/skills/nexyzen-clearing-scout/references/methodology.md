@@ -62,7 +62,7 @@ the algorithm is not part of this public skill.
 Ledger rows leave the machine only on explicit request, with VAT numbers
 pseudonymized (SHA-256, first 20 hex chars, `PS` prefix) by default:
 the same VAT always maps to the same token, so matching still works, but the
-token is not reversible. Credentials live in environment variables, never in
+token is NOT anonymous: VAT numbers are public, so the hash can be reversed. Credentials live in environment variables, never in
 files. The engine only *detects* offsets — no payment is ever initiated, on
 Qonto or anywhere else.
 

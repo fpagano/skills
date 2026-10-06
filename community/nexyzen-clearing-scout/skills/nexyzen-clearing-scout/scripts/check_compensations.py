@@ -14,6 +14,9 @@ c.c.): only the user can do it, themselves, on the Nexyzen acceptance page
 that `list` points to. An agent must never accept, confirm declarations or
 attest warranties on the user's behalf.
 
+Both commands are network calls to Nexyzen (not Qonto) and send the
+organization's VAT number IN CLEAR to look up its proposals and letters.
+
 When every participant of a cycle has accepted, the cycle is finalized by the
 clearing house and the matched amounts are settled without any bank transfer.
 
@@ -30,11 +33,6 @@ import json
 import os
 import sys
 import urllib.request
-
-try:
-    import local_secrets  # noqa: F401  (optional, gitignored — see scripts/local_secrets.example.py)
-except ImportError:
-    pass
 
 DEFAULT_BASE_URL = "https://webapp.cameracompensazione.it/webservices/index.php"
 ACCEPTANCE_PAGE = "https://webapp.cameracompensazione.it/attiva_compensazione.php?token="

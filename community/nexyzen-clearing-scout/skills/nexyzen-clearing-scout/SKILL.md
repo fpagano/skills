@@ -2,22 +2,22 @@
 name: nexyzen-clearing-scout
 description: >
   Find money frozen in unpaid invoices and settle it without bank transfers.
-  Builds a clearing ledger from Qonto client and supplier invoices, detects
-  bilateral set-off opportunities (counterparties that are both client and
-  supplier), previews multilateral clearing cycles across the network, and
-  drafts a legally grounded set-off proposal. Use when the user asks about
-  frozen working capital, unpaid/overdue invoices, offsetting debts with a
-  counterparty, invoice clearing, netting, or "compensazione" of receivables
-  and payables. DISCLOSURE: by default everything stays local (read-only on
-  Qonto, deterministic scripts). Only if the user explicitly asks and
-  confirms the exact list, it can transmit open-invoice data (pseudonymized
-  VAT numbers, invoice numbers, dates, amounts) to Nexyzen, a third-party
-  clearing service run by Camera di Compensazione S.r.l., not by Qonto. The
-  agent can never accept a compensation or make any legal declaration: that
-  binding step is performed by the user themselves on Nexyzen's own page.
+  Builds a clearing ledger from Qonto invoices, detects bilateral set-off
+  opportunities, previews multilateral clearing cycles, and drafts a set-off
+  proposal. Use for frozen working capital, unpaid or overdue invoices,
+  offsetting debts with a counterparty, netting, or "compensazione".
+  DISCLOSURE: Qonto is only read, never written to; analysis is local. Two
+  optional steps contact Nexyzen, a third-party service run by Camera di
+  Compensazione S.r.l., not by Qonto. (1) Submission sends open-invoice data
+  (both parties' VAT numbers, invoice numbers, dates, amounts), pseudonymized
+  by default, which is NOT anonymous since VAT numbers are public; an optional
+  clear mode shares counterparties' data in full. The user must type a
+  confirmation on their own terminal. (2) Looking up proposals sends your
+  organization's VAT number in clear. The agent can never accept a
+  compensation or make legal declarations: the user does it on Nexyzen's page.
 permissions:
   mcp:
-    qonto: [change_supplier_invoice_status, get_organization, list_client_invoices, list_supplier_invoices, mark_client_invoice_as_paid]
+    qonto: [get_organization, list_client_invoices, list_supplier_invoices]
   network: [webapp.cameracompensazione.it]
   env: [NEXYZEN_AFFILIATE_CODE, NEXYZEN_BASE_URL, NEXYZEN_TOKEN]
   tools: [Read, Bash]
@@ -37,25 +37,32 @@ auditable. Your job is to fetch the data, run the scripts, and narrate the
 results clearly. Never estimate or compute offsets yourself: run the scripts.
 See `references/methodology.md` for definitions and how to read each report.
 
-This skill never initiates payments, transfers, or any money movement. The
-only write action it may perform on Qonto — marking an invoice as paid after
-a completed set-off — requires explicit user confirmation first.
+This skill never initiates payments, transfers, or any money movement, and
+it never writes to Qonto: it only reads invoices. If a set-off completes, the
+user records it in Qonto themselves.
 
 ## What leaves Qonto, and what you must never do
 
 Steps 1-4 are local: data is read from Qonto and processed by scripts on the
 user's machine; nothing is sent anywhere.
 
-There are exactly two points where a third party is involved, and both need
-the user's explicit, informed yes:
+There are exactly three points where a third party (Nexyzen, operated by
+Camera di Compensazione S.r.l., not by Qonto) is involved:
 
-1. **Submission (step 5)** transmits business and fiscal data to Nexyzen, an
-   external service operated by Camera di Compensazione S.r.l. Before running
+1. **Submission (step 5)** transmits business and fiscal data. Before running
    it you MUST show the user the dry-run list (every invoice, counterparty
    pseudonym, amount) and say plainly that it goes to a third party that is
-   not Qonto. Send only after the user confirms that list, and drop any
-   invoice they exclude.
-2. **Acceptance of a compensation (step 6)** is a binding legal act: a credit
+   not Qonto. The VAT pseudonyms are SHA-256 hashes, which is **not
+   anonymization**: VAT numbers are public, so the hashes can be reversed. The
+   `--no-pseudonymize` mode sends the counterparties' VAT numbers, invoice
+   numbers and amounts in clear; offer it only if the user asks, and tell
+   them it shares data of third parties who did not agree to it. The
+   script itself makes the user type a confirmation on their own terminal;
+   it cannot be answered by you, and if no terminal is available you must
+   tell the user to run the command themselves.
+2. **Lookups (step 6)**: `list` and `letters` send the organization's VAT
+   number in clear to Nexyzen. Say so before the first call.
+3. **Acceptance of a compensation (step 6)** is a binding legal act: a credit
    assignment with the assignor's warranties (art. 1266 c.c.). **You must
    never accept a compensation, confirm declarations, attest warranties, or
    fill in legal-representative data on the user's behalf.** This skill has no
@@ -160,8 +167,13 @@ python scripts/submit_to_nexyzen.py --ledger ledger.json \
    the same command adding `--send` (and `--exclude-invoice <number>` for
    every invoice they dropped).
 
-Sending requires `NEXYZEN_AFFILIATE_CODE` and `NEXYZEN_TOKEN` in the
-environment; without them, or without `--send`, nothing is transmitted.
+With `--send`, the script then asks the user to type a confirmation phrase
+on **their own terminal**, not on stdin, so you cannot answer it for them. If
+there is no terminal (for example in a remote sandbox), the script refuses and
+tells you so: then tell the user to run the same command themselves in their
+own terminal. Sending requires plain `NEXYZEN_AFFILIATE_CODE` and
+`NEXYZEN_TOKEN` environment variables; without them, or without `--send`,
+nothing is transmitted.
 
 **Set expectations on timing.** Submitting does not return an instant
 answer. Bilateral matches (step 3) are already visible from the user's own
@@ -207,12 +219,11 @@ Present each letter to the user (the `--json` output carries the full HTML
 body) — it is the legal record of the settled set-off; suggest attaching it
 to the corresponding invoices in Qonto.
 
-**Mark as paid (only on explicit request).** After a set-off is accepted by
-all parties — and only for invoices whose open amount is fully covered by
-the cycle — use the Qonto MCP tools `mark_client_invoice_as_paid` /
-`change_supplier_invoice_status` to record the settled invoices, one by one,
-after the user confirms each. Partially covered invoices stay open: report
-their new residual instead.
+**Recording the set-off in Qonto is up to the user.** This skill does not mark
+invoices as paid: an external service saying a set-off completed is not a
+reason to change the user's books. If the user asks which invoices the letter
+covers, list them and note that partially covered invoices stay open with
+their new residual; the user records any change in Qonto themselves.
 
 ## Reporting guidelines
 

@@ -9,25 +9,28 @@ Flow (see swagger: /webservices/index.php):
   1. POST /connect     (op "gjwt")        -> 1-hour JWT
   2. POST /send_manual (op "ins_manuale") -> one call per open invoice
 
-Privacy by design: by default VAT numbers are pseudonymized with SHA-256
-before leaving the machine (--no-pseudonymize sends them in clear, which the
-counterparty matching in production requires — ask Nexyzen for guidance).
-No payment is ever initiated: the engine only detects offset opportunities.
+Pseudonymization is NOT anonymization: by default VAT numbers are replaced by
+a SHA-256 token, but VAT numbers are public and easy to enumerate, so the
+token can be reversed by hashing candidates. --no-pseudonymize sends the VAT
+numbers in clear, together with invoice numbers, dates and amounts of THIRD
+PARTIES (your counterparties), who have not agreed to any of it. No payment is
+ever initiated: the engine only detects offset opportunities.
 
-Credentials come from environment variables and are NEVER stored in the repo:
+Credentials come from plain environment variables and are NEVER stored in the repo:
   NEXYZEN_AFFILIATE_CODE   affiliate code (from commerciale@cameracompensazione.it)
   NEXYZEN_TOKEN            API token
   NEXYZEN_BASE_URL         optional override of the API base URL
 
-THIRD-PARTY TRANSMISSION: this script sends, for each open invoice, the
-(pseudonymized) VAT numbers of both parties, invoice number, date, total and
-open amount, plus an optional notification email, to Nexyzen — a service
-operated by Camera di Compensazione S.r.l., not by Qonto.
+THIRD-PARTY TRANSMISSION: this script sends, for each open invoice, the VAT
+numbers of both parties (pseudonymized, or in clear with --no-pseudonymize),
+invoice number, date, total and open amount, plus an optional notification
+email, to Nexyzen — a service operated by Camera di Compensazione S.r.l., not
+by Qonto.
 
-The default is DRY RUN: it only prints what would be sent. Nothing is
-transmitted unless --send is passed, which an agent must do only after the
-user has seen the exact list and explicitly confirmed it. The user can drop
-single invoices with --exclude-invoice.
+The default is DRY RUN: it only prints what would be sent. With --send the
+script additionally asks for a typed confirmation on the user's own terminal
+(not stdin, so a calling agent cannot answer it). With no terminal available it
+refuses and tells the user to run the command themselves.
 
 Usage:
   python submit_to_nexyzen.py --ledger ledger.json --org-vat IT03671960833 \
@@ -40,19 +43,45 @@ import hashlib
 import json
 import os
 import sys
+import threading
 import urllib.request
-
-try:
-    import local_secrets  # noqa: F401  (optional, gitignored — see scripts/local_secrets.example.py)
-except ImportError:
-    pass
 
 DEFAULT_BASE_URL = "https://webapp.cameracompensazione.it/webservices/index.php"
 PROVENANCE_CODE = "QONTO_MCP"  # native attribution for the Qonto integration
 
 
+def confirm_on_user_terminal(expected: str) -> bool | None:
+    """Ask the user to type `expected` on their own terminal.
+
+    Reads from the terminal device (CONIN$ on Windows, /dev/tty elsewhere), never
+    from stdin, so an agent that launches this script cannot answer for the user.
+    Returns True/False for the typed answer, or None when no terminal exists.
+    """
+    dev_in, dev_out = ("CONIN$", "CONOUT$") if os.name == "nt" else ("/dev/tty", "/dev/tty")
+    result: list = []
+
+    def ask() -> None:
+        try:
+            with open(dev_out, "w") as out, open(dev_in) as inp:
+                out.write(f"\nTo send, type exactly:  {expected}\n> ")
+                out.flush()
+                result.append(inp.readline().strip() == expected)
+        except OSError:
+            result.append(None)
+
+    t = threading.Thread(target=ask, daemon=True)
+    t.start()
+    t.join(timeout=120)  # nobody at the terminal: give up instead of hanging
+    return result[0] if result else None
+
+
 def pseudonymize(vat: str) -> str:
-    """Deterministic pseudonym: same VAT -> same token, not reversible."""
+    """Deterministic pseudonym: same VAT -> same token.
+
+    This is NOT anonymization: VAT numbers are public and low-entropy, so the
+    hash can be reversed by hashing candidate numbers. Treat it as a light
+    obfuscation, not as protection of the counterparties' identity.
+    """
     return "PS" + hashlib.sha256(vat.encode("utf-8")).hexdigest()[:20].upper()
 
 
@@ -125,7 +154,9 @@ def main() -> int:
     ap.add_argument("--exclude-invoice", action="append", default=[], metavar="NUMBER",
                     help="invoice number the user does not want to send (repeatable)")
     ap.add_argument("--no-pseudonymize", action="store_true",
-                    help="send clear VAT numbers instead of SHA-256 pseudonyms")
+                    help="send VAT numbers in clear instead of SHA-256 pseudonyms. This shares "
+                         "your counterparties' VAT numbers, invoice numbers and amounts with a "
+                         "third party; the user must understand this before choosing it")
     ap.add_argument("--default-country", default=None,
                     help="country prefix for VAT numbers that lack one (e.g. IT); clear mode only")
     args = ap.parse_args()
@@ -157,6 +188,22 @@ def main() -> int:
                   file=sys.stderr)
         else:
             print("To transmit, the user must first confirm this list; then re-run with --send.")
+        return 0
+
+    # --send: the user must confirm on their own terminal. An agent cannot do it.
+    if args.no_pseudonymize:
+        print("WARNING: CLEAR mode. VAT numbers, invoice numbers, dates and amounts of "
+              "your counterparties (third parties) will be sent to Nexyzen in clear.",
+              file=sys.stderr)
+    phrase = f"SEND {len(payloads)} INVOICES" + (" IN CLEAR" if args.no_pseudonymize else "")
+    answer = confirm_on_user_terminal(phrase)
+    if answer is None:
+        print("REFUSED: no interactive terminal available. Sending needs the user to type a "
+              "confirmation, so the user must run this same command themselves in their own "
+              "terminal.", file=sys.stderr)
+        return 3
+    if not answer:
+        print("Confirmation not given. Nothing was sent.")
         return 0
 
     print(f"Connecting to {base_url} ...")
