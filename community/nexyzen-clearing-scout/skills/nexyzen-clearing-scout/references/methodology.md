@@ -66,9 +66,10 @@ clear: the engine matches companies by VAT number, so without them it cannot
 find cycles. That includes the VAT numbers, invoice numbers and amounts of
 the user's counterparties. There is no hashed or anonymous mode on purpose:
 VAT numbers are public, so a hash is trivially reversible and would only
-suggest a protection that does not exist. Credentials live in environment variables, never in
-files. The engine only *detects* offsets — no payment is ever initiated, on
-Qonto or anywhere else.
+suggest a protection that does not exist. Credentials live in environment
+variables, never in files. Network requests use only the fixed Nexyzen HTTPS
+API; redirects and destination overrides are not supported. The engine only
+*detects* offsets — no payment is ever initiated, on Qonto or anywhere else.
 
 ## Timing: submission is on-demand, matching is not
 

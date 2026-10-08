@@ -21,7 +21,7 @@ opportunities.
 Credentials come from plain environment variables and are NEVER stored in the repo:
   NEXYZEN_AFFILIATE_CODE   affiliate code (from commerciale@cameracompensazione.it)
   NEXYZEN_TOKEN            API token
-  NEXYZEN_BASE_URL         optional override of the API base URL
+The API destination is fixed to Nexyzen over HTTPS; redirects are refused.
 
 THIRD-PARTY TRANSMISSION: this script sends, for each open invoice, the VAT
 numbers of both parties (in clear), invoice number, date, total and open
@@ -44,9 +44,9 @@ import json
 import os
 import sys
 import threading
-import urllib.request
 
-DEFAULT_BASE_URL = "https://webapp.cameracompensazione.it/webservices/index.php"
+from nexyzen_http import BASE_URL, post_json
+
 PROVENANCE_CODE = "QONTO_MCP"  # native attribution for the Qonto integration
 
 
@@ -73,17 +73,6 @@ def confirm_on_user_terminal(expected: str) -> bool | None:
     t.start()
     t.join(timeout=120)  # nobody at the terminal: give up instead of hanging
     return result[0] if result else None
-
-
-def post_json(url: str, payload: dict) -> dict:
-    req = urllib.request.Request(
-        url,
-        data=json.dumps(payload).encode("utf-8"),
-        headers={"Content-Type": "application/json"},
-        method="POST",
-    )
-    with urllib.request.urlopen(req, timeout=30) as resp:
-        return json.loads(resp.read().decode("utf-8"))
 
 
 def build_payloads(ledger: dict, org_vat: str, email: str | None,
@@ -156,7 +145,7 @@ def main() -> int:
 
     affiliate = os.environ.get("NEXYZEN_AFFILIATE_CODE")
     token = os.environ.get("NEXYZEN_TOKEN")
-    base_url = os.environ.get("NEXYZEN_BASE_URL", DEFAULT_BASE_URL)
+    base_url = BASE_URL
 
     # Default is DRY RUN: nothing leaves the machine unless --send is given AND
     # credentials are configured.

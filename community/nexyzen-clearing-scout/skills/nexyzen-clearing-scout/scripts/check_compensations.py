@@ -21,7 +21,8 @@ When every participant of a cycle has accepted, the cycle is finalized by the
 clearing house and the matched amounts are settled without any bank transfer.
 
 Credentials via environment (same as submit_to_nexyzen.py):
-  NEXYZEN_AFFILIATE_CODE, NEXYZEN_TOKEN, NEXYZEN_BASE_URL (optional override)
+  NEXYZEN_AFFILIATE_CODE, NEXYZEN_TOKEN
+The API destination is fixed to Nexyzen over HTTPS; redirects are refused.
 
 Usage:
   python check_compensations.py list --org-vat IT03671960833
@@ -32,22 +33,16 @@ import argparse
 import json
 import os
 import sys
-import urllib.request
+import urllib.error
 
-DEFAULT_BASE_URL = "https://webapp.cameracompensazione.it/webservices/index.php"
+from nexyzen_http import BASE_URL, post_json as nexyzen_post_json
+
 ACCEPTANCE_PAGE = "https://webapp.cameracompensazione.it/attiva_compensazione.php?token="
 
 
 def post_json(url: str, payload: dict) -> dict:
-    req = urllib.request.Request(
-        url,
-        data=json.dumps(payload).encode("utf-8"),
-        headers={"Content-Type": "application/json"},
-        method="POST",
-    )
     try:
-        with urllib.request.urlopen(req, timeout=30) as resp:
-            return json.loads(resp.read().decode("utf-8"))
+        return nexyzen_post_json(url, payload)
     except urllib.error.HTTPError as e:
         try:
             body = json.loads(e.read().decode("utf-8"))
@@ -153,7 +148,7 @@ def main() -> int:
     p_letters.add_argument("--json", action="store_true", help="raw JSON output (full HTML bodies)")
     args = ap.parse_args()
 
-    base_url = os.environ.get("NEXYZEN_BASE_URL", DEFAULT_BASE_URL)
+    base_url = BASE_URL
     if args.cmd == "list":
         return cmd_list(base_url, args.org_vat, args.json, args.lang)
     return cmd_letters(base_url, args.org_vat, args.all, args.json, args.lang)

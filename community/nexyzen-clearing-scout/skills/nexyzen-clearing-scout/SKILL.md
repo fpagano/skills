@@ -19,7 +19,7 @@ permissions:
   mcp:
     qonto: [get_organization, list_client_invoices, list_supplier_invoices]
   network: [webapp.cameracompensazione.it]
-  env: [NEXYZEN_AFFILIATE_CODE, NEXYZEN_BASE_URL, NEXYZEN_TOKEN]
+  env: [NEXYZEN_AFFILIATE_CODE, NEXYZEN_TOKEN]
   tools: [Read, Bash]
 ---
 
@@ -74,6 +74,10 @@ Camera di Compensazione S.r.l., not by Qonto) is involved:
 Never pass `--send` on your own initiative, never reuse an earlier "yes" for a
 different batch, and never treat the user's request to "check" or "look at"
 their positions as consent to submit anything.
+
+Both network scripts use only the fixed HTTPS API at
+`https://webapp.cameracompensazione.it/webservices/index.php` and refuse
+redirects. The destination cannot be overridden through environment variables.
 
 ## Workflow
 
