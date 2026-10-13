@@ -134,6 +134,23 @@ def cmd_letters(base_url: str, org_vat: str, include_delivered: bool, as_json: b
     return 0
 
 
+def cmd_request_token(base_url: str, org_vat: str, lang: str) -> int:
+    """Ask the engine to send the company token_azienda to the PEC on file for
+    this VAT. The token is never returned here: it is delivered only to the PEC
+    (secure recovery channel), so the agent never sees it."""
+    jwt = get_jwt(base_url)
+    resp = post_json(base_url, {
+        "op": "richiedi_token_azienda",
+        "jwt": jwt,
+        "dati": {"partita_iva": org_vat, "lingua": lang},
+    })
+    if resp.get("sent"):
+        print(f"Company token sent to the PEC {resp.get('destinatario_pec', '')}.")
+    else:
+        print(f"Company token NOT sent: {resp.get('message', 'no PEC on file for this VAT')}")
+    return 0
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--lang", choices=["en", "it"], default="en",
@@ -146,11 +163,16 @@ def main() -> int:
     p_letters.add_argument("--org-vat", required=True, help="VAT of the organization (as submitted)")
     p_letters.add_argument("--all", action="store_true", help="include letters already delivered")
     p_letters.add_argument("--json", action="store_true", help="raw JSON output (full HTML bodies)")
+    p_token = sub.add_parser("request-token",
+                             help="send the company token (token_azienda) to the PEC on file for the VAT")
+    p_token.add_argument("--org-vat", required=True, help="VAT of the organization (as submitted)")
     args = ap.parse_args()
 
     base_url = BASE_URL
     if args.cmd == "list":
         return cmd_list(base_url, args.org_vat, args.json, args.lang)
+    if args.cmd == "request-token":
+        return cmd_request_token(base_url, args.org_vat, args.lang)
     return cmd_letters(base_url, args.org_vat, args.all, args.json, args.lang)
 
 

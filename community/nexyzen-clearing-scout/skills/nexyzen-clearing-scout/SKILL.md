@@ -227,6 +227,26 @@ Present each letter to the user (the `--json` output carries the full HTML
 body) — it is the legal record of the settled set-off; suggest attaching it
 to the corresponding invoices in Qonto.
 
+**Recover the company token (token_azienda).** The `token_azienda` authorizes
+the per-company operations. If the user lost it, the engine can send it to the
+PEC on file for their VAT — it is **never** returned to you, only delivered to
+that PEC (secure recovery channel):
+
+```
+python scripts/check_compensations.py request-token --org-vat <ORG_VAT>
+```
+
+Report only whether it was sent (and to which masked PEC); if the VAT has no PEC
+on file, the command says so and the user must register one first.
+
+**Rejected invoices.** When submitting (step 5), the engine rejects an invoice
+if it cannot find a PEC for a party and only the VAT number was sent — it needs
+the PEC to notify the credit-assignment deed. The submit script prints each
+rejected invoice with the engine's message and keeps going with the others;
+report those to the user verbatim (typically: resend once the party has a
+registered PEC, or, for a professional/individual, include their codice
+fiscale).
+
 **Recording the set-off in Qonto is up to the user.** This skill does not mark
 invoices as paid: an external service saying a set-off completed is not a
 reason to change the user's books. If the user asks which invoices the letter
