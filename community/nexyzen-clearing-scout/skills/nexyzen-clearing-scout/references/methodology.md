@@ -59,8 +59,10 @@ the algorithm is not part of this public skill.
 
 ## Privacy (submit_to_nexyzen.py)
 
-Ledger rows leave the machine only on explicit request, and a typed
-confirmation by the user on their own terminal. They go to Nexyzen, a service
+The workflow requires fresh user approval in chat of the exact invoice batch
+before sending. The script also asks for typed terminal confirmation as an
+extra precaution, not a human-only security boundary: terminal input can be
+automated. Ledger rows go to Nexyzen, a service
 operated by Camera di Compensazione S.r.l., not by Qonto, with VAT numbers in
 clear: the engine matches companies by VAT number, so without them it cannot
 find cycles. That includes the VAT numbers, invoice numbers and amounts of

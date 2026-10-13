@@ -29,9 +29,11 @@ amount, plus an optional notification email, to Nexyzen — a service operated
 by Camera di Compensazione S.r.l., not by Qonto.
 
 The default is DRY RUN: it only prints what would be sent. With --send the
-script additionally asks for a typed confirmation on the user's own terminal
-(not stdin, so a calling agent cannot answer it). With no terminal available it
-refuses and tells the user to run the command themselves.
+script additionally asks for typed confirmation through a terminal device,
+not stdin. This is an extra precaution, not proof of human approval: an agent
+can automate terminal input. Agents must first obtain fresh user approval in
+chat for the exact batch and must not automate or bypass the prompt. With no
+terminal available it refuses and tells the user to run the command themselves.
 
 Usage:
   python submit_to_nexyzen.py --ledger ledger.json --org-vat IT03671960833 \
@@ -51,10 +53,10 @@ PROVENANCE_CODE = "QONTO_MCP"  # native attribution for the Qonto integration
 
 
 def confirm_on_user_terminal(expected: str) -> bool | None:
-    """Ask the user to type `expected` on their own terminal.
+    """Ask for `expected` through the terminal device.
 
     Reads from the terminal device (CONIN$ on Windows, /dev/tty elsewhere), never
-    from stdin, so an agent that launches this script cannot answer for the user.
+    from stdin. Terminal input can be automated; this is not a human-only gate.
     Returns True/False for the typed answer, or None when no terminal exists.
     """
     dev_in, dev_out = ("CONIN$", "CONOUT$") if os.name == "nt" else ("/dev/tty", "/dev/tty")
@@ -161,7 +163,7 @@ def main() -> int:
             print("To transmit, the user must first confirm this list; then re-run with --send.")
         return 0
 
-    # --send: the user must confirm on their own terminal. An agent cannot do it.
+    # Extra terminal precaution; fresh user approval in chat is still required.
     print("WARNING: VAT numbers, invoice numbers, dates and amounts of your "
           "counterparties (third parties who have not agreed to this) will be sent "
           "to Nexyzen IN CLEAR.", file=sys.stderr)
