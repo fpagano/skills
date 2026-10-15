@@ -9,7 +9,7 @@ description: >
   DISCLOSURE: Qonto is only read, never written to; analysis is local. Two
   optional steps contact Nexyzen, a third-party service run by Camera di
   Compensazione S.r.l., not by Qonto. (1) Submission sends open-invoice data
-  with both parties' VAT numbers IN CLEAR (clearing matches companies by VAT),
+  with both parties' EU VAT numbers IN CLEAR (matched by VAT, any EU country),
   plus invoice numbers, dates and amounts: it shares your counterparties' data
   with a third party; there is no anonymous mode. Sending requires fresh
   user approval of the batch in chat, plus a terminal prompt. (2) Lookups
